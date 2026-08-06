@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Practical AI tools for D9Network member business growth.">
+  <title>D9Network AI Business Growth Kit</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <section id="authView" class="auth-shell">
+    <div class="auth-brand">
+      <div class="brand-lockup"><img src="/d9-logo-white.png" alt=""><div><strong>D9Network</strong><span>AI Business Growth Kit</span></div></div>
+      <div class="auth-copy"><p class="eyebrow light">Built for practical progress</p><h1>Turn business goals into focused action.</h1><p>Guided AI workflows help you sharpen your message, strengthen operations, and prepare for your next opportunity.</p></div>
+      <div class="benefits"><div><b>Guided</b><span>Clear questions, useful output</span></div><div><b>Curated</b><span>Built around business outcomes</span></div><div><b>Member-led</b><span>Access matched to your tier</span></div></div>
+    </div>
+    <div class="auth-panel">
+      <form id="loginForm" class="auth-card">
+        <img src="/d9-logo.png" alt="D9Network" class="mobile-logo">
+        <p class="eyebrow">Member access</p><h2>Welcome to your Growth Kit</h2><p class="muted">Sign in with the email connected to your D9Network membership.</p>
+        <label>Email address<input name="email" type="email" autocomplete="email" required></label>
+        <label>Password<input name="password" type="password" autocomplete="current-password" minlength="8" required></label>
+        <button class="button primary wide" type="submit">Sign in securely</button>
+        <p class="form-message" data-message></p>
+        <p class="fine-print">Need an account or password help? Contact your D9Network administrator.</p>
+      </form>
+      <form id="verifyForm" class="auth-card hidden">
+        <button class="text-button" type="button" data-signout>← Use another account</button>
+        <p class="eyebrow">One-time verification</p><h2>Match your member record</h2><p class="muted">Enter the details shown in your current D9Network membership record.</p>
+        <label>Email address<input name="email" type="email" readonly required></label>
+        <label>Brilliant Directories user ID<input name="user_id" autocomplete="off" required></label>
+        <label>Membership tier<select name="membership" required><option value="">Select your tier</option><option>Bronze</option><option>Silver</option><option>Gold</option><option>Platinum</option></select></label>
+        <button class="button primary wide" type="submit">Verify membership</button><p class="form-message" data-message></p>
+      </form>
+    </div>
+  </section>
+
+  <div id="appView" class="app-shell hidden">
+    <aside class="sidebar">
+      <div class="side-brand"><img src="/d9-logo-white.png" alt=""><div><strong>AI Growth Kit</strong><span>D9Network</span></div></div>
+      <nav aria-label="Main navigation">
+        <p class="nav-label">Your workspace</p>
+        <button class="nav-item active" data-page="library"><span>⌂</span>Prompt library</button>
+        <button class="nav-item" data-page="saved"><span>☆</span>Saved prompts</button>
+        <button class="nav-item" data-page="history"><span>↻</span>Recent activity</button>
+        <div id="adminNav" class="hidden"><p class="nav-label">Administration</p><button class="nav-item" data-page="admin"><span>▦</span>Admin console</button><button class="nav-item" data-page="import"><span>⇧</span>Member sync</button></div>
+      </nav>
+      <div class="side-profile"><div class="avatar" id="avatar">D9</div><div><b id="memberName">D9 Member</b><span id="memberTier">Member</span></div><button class="icon-button" data-signout aria-label="Sign out">↪</button></div>
+    </aside>
+    <main class="main">
+      <header class="topbar"><button id="menuButton" class="icon-button menu" aria-label="Open menu">☰</button><div><p class="eyebrow">D9Network member tools</p><h2 id="pageTitle">Prompt library</h2></div><span id="tierBadge" class="tier-badge">Member</span></header>
+      <div class="content">
+        <section id="page-library" class="page active">
+          <div class="hero"><div><p class="eyebrow light">Your next best move</p><h1>What would you like to accomplish?</h1><p>Choose a guided workflow. Answer a few focused questions, then take the finished prompt to the AI assistant you already use.</p></div><div class="hero-stat"><span>Available now</span><b id="promptCount">0</b><small>member workflows</small></div></div>
+          <div class="toolbar"><label class="search"><span class="sr-only">Search prompts</span><input id="searchInput" type="search" placeholder="Search by goal, topic, or outcome"></label><select id="categoryFilter" aria-label="Filter by category"><option value="all">All categories</option></select></div>
+          <div id="categoryCards" class="category-grid"></div>
+          <div class="section-heading"><div><p class="eyebrow">Explore the library</p><h3>Ready when you are</h3></div><span id="resultCount" class="muted"></span></div>
+          <div id="promptGrid" class="prompt-grid"></div>
+        </section>
+        <section id="page-workspace" class="page"><button class="text-button back" data-page="library">← Back to library</button><div id="workspace"></div></section>
+        <section id="page-saved" class="page"><div class="section-heading"><div><p class="eyebrow">Your collection</p><h3>Saved prompts</h3></div></div><div id="savedGrid" class="prompt-grid"></div></section>
+        <section id="page-history" class="page"><div class="panel"><p class="eyebrow">This device</p><h3>Recent activity</h3><p class="muted">Your generated prompts stay private in this browser session.</p><div id="historyList"></div></div></section>
+        <section id="page-admin" class="page"><div class="section-heading"><div><p class="eyebrow">Authorized administrators</p><h3>Admin console</h3></div><button id="newPrompt" class="button primary">New prompt</button></div><div id="adminStats" class="stats"></div><div class="admin-grid"><div class="panel"><div class="panel-title"><h3>Prompt catalog</h3><input id="adminSearch" type="search" placeholder="Search prompts"></div><div id="promptTable" class="table-wrap"></div></div><div><div class="panel"><div class="panel-title"><h3>Administrators</h3><button id="newRole" class="button subtle">Add</button></div><div id="roleList"></div></div><div class="panel stacked"><div class="panel-title"><h3>Categories</h3><button id="newCategory" class="button subtle">Add</button></div><div id="categoryList"></div></div></div></div></section>
+        <section id="page-import" class="page"><div class="section-heading"><div><p class="eyebrow">Brilliant Directories</p><h3>Member synchronization</h3></div></div><div class="import-layout"><form id="importForm" class="panel"><h3>Upload member export</h3><p class="muted">CSV or XLSX, up to 5 MB and 10,000 rows. Required columns: user_id, email, and subscription_name.</p><label class="drop-zone">Choose a CSV or XLSX file<input id="memberFile" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required><span id="fileName">No file selected</span></label><button class="button primary" type="submit">Preview synchronization</button></form><div id="importPreview" class="panel"><h3>Preview results</h3><p class="muted">Upload a file to review accepted, ignored, rejected, and duplicate records before committing.</p></div></div></section>
+      </div>
+    </main>
+  </div>
+
+  <dialog id="editorDialog"><form id="editorForm" method="dialog" class="dialog-card"><div class="dialog-head"><div><p class="eyebrow">Content management</p><h3 id="editorTitle">Prompt</h3></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div><input name="id" type="hidden"><div class="form-grid"><label>Title<input name="title" required></label><label>Slug<input name="slug" pattern="[a-z0-9-]+" required></label><label>Category<select name="category_id" required></select></label><label>Minimum tier<select name="minimum_tier"><option>Bronze</option><option>Silver</option><option>Gold</option><option>Platinum</option></select></label><label class="span-2">Description<input name="description" required></label><label class="span-2">Questions <span class="hint">One per line, optionally key|Question</span><textarea name="questions" rows="5"></textarea></label><label class="span-2">Prompt template<textarea name="user_prompt_template" rows="7" required></textarea></label><label>Estimated minutes<input name="estimated_minutes" type="number" min="1" value="10"></label><label class="check"><input name="is_featured" type="checkbox"> Featured</label><label class="check"><input name="is_published" type="checkbox"> Published</label></div><div class="dialog-actions"><button id="deletePrompt" class="button danger hidden" type="button">Delete</button><button class="button subtle" value="cancel">Cancel</button><button id="savePrompt" class="button primary" value="default">Save prompt</button></div><p class="form-message" data-message></p></form></dialog>
+  <dialog id="roleDialog"><form id="roleForm" method="dialog" class="dialog-card small"><div class="dialog-head"><h3>Add administrator</h3><button class="icon-button" value="cancel">×</button></div><label>Email<input name="email" type="email" required></label><label>Role<select name="role"><option value="data_admin">Data administrator</option><option value="content_admin">Content administrator</option><option value="organization_leader">Organization leader</option><option value="platform_admin">Platform administrator</option></select></label><div class="dialog-actions"><button class="button subtle" value="cancel">Cancel</button><button class="button primary" value="default">Assign role</button></div><p class="form-message" data-message></p></form></dialog>
+  <dialog id="categoryDialog"><form id="categoryForm" method="dialog" class="dialog-card small"><div class="dialog-head"><h3>Prompt category</h3><button class="icon-button" value="cancel">×</button></div><input name="id" type="hidden"><label>Name<input name="name" required></label><label>Slug<input name="slug" pattern="[a-z0-9-]+" required></label><label>Description<textarea name="description" rows="3"></textarea></label><label>Sort order<input name="sort_order" type="number" value="0"></label><div class="dialog-actions"><button id="deleteCategory" class="button danger hidden" type="button">Delete</button><button class="button subtle" value="cancel">Cancel</button><button class="button primary" value="default">Save category</button></div><p class="form-message" data-message></p></form></dialog>
+</body>
+</html>

@@ -1,0 +1,23 @@
+{
+  "name": "d9network-ai-growth-kit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "White-labeled D9Network AI Business Growth Kit",
+  "scripts": {
+    "dev": "netlify dev",
+    "preview": "node scripts/serve-static.js",
+    "build": "node scripts/build.js",
+    "check": "node scripts/check-config.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@netlify/functions": "^3.0.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "netlify-cli": "^18.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
