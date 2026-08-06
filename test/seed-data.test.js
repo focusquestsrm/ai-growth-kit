@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const migrations = ['003_complete_growth_kit.sql','004_business_growth_platform.sql'].map((name) => fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', name), 'utf8')).join('\n');
+const migrations = ['003_complete_growth_kit.sql','004_business_growth_platform.sql','005_business_growth_assessment.sql'].map((name) => fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', name), 'utf8')).join('\n');
 const categories = ['profile-branding','marketing-content','sales-relationships','strategy-operations','opportunities-procurement','leadership-growth'];
 const requiredTools = [
   'Business Profile Enhancer','Elevator Pitch Creator','Tagline Generator','Social Media Post','Customer FAQ Builder','Ideal Customer Profile','Basic SWOT Analysis',
@@ -21,6 +21,10 @@ test('all six Business Growth Categories are represented', () => {
   categories.forEach((slug) => assert.ok(migrations.includes(`'${slug}'`), `missing ${slug}`));
 });
 
-test('platform migration adds reusable profile, favorites, feedback, and health data', () => {
-  ['business_description','business_goals','favorite_tools','platform_feedback','business_health_assessments','output_format'].forEach((name) => assert.match(migrations, new RegExp(name)));
+test('platform migrations add profiles, saved strategies, feedback, and assessment data', () => {
+  ['business_description','business_goals','favorite_tools','platform_feedback','saved_strategies','assessment_versions','assessment_sections','assessment_questions','assessment_responses','assessment_results','assessment_recommendations','output_format'].forEach((name) => assert.match(migrations, new RegExp(name)));
+});
+
+test('migrations contain no seeded members, profiles, strategies, responses, or feedback', () => {
+  ['member_app_access','business_profiles','saved_strategies','assessment_responses','platform_feedback'].forEach((table) => assert.doesNotMatch(migrations, new RegExp(`insert\\s+into\\s+(?:public\\.)?${table}[^;]{0,300}\\bvalues\\b`, 'i'), `seeded data found in ${table}`));
 });

@@ -1,4 +1,4 @@
-const { parseJson, preflight, response } = require('./_shared');
+const { normalizeEmail, parseJson, preflight, response, sb } = require('./_shared');
 
 exports.handler = async (event) => {
   const pf = preflight(event, ['POST']);
@@ -22,6 +22,7 @@ exports.handler = async (event) => {
     });
     if (!result.ok) return response(401, { error: 'The email or password is incorrect.' });
     const session = await result.json();
+    try { await sb(`user_roles?normalized_email=eq.${encodeURIComponent(normalizeEmail(session.user.email))}`, { method:'PATCH', headers:{ Prefer:'return=minimal' }, body:JSON.stringify({ last_login_at:new Date().toISOString() }) }); } catch {}
     return response(200, { access_token: session.access_token, refresh_token: session.refresh_token, expires_in: session.expires_in, user: { id: session.user.id, email: session.user.email } });
   } catch (error) {
     console.error('auth-session', error);

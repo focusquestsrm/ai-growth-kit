@@ -9,7 +9,7 @@ const ALLOWED_TYPES = ['text/csv', 'application/csv', 'application/vnd.ms-excel'
 exports.handler = async (event) => {
   const pf = preflight(event, ['POST']);
   if (pf) return pf;
-  const admin = await requireRoles(event, ['organization_leader', 'data_admin', 'platform_admin']);
+  const admin = await requireRoles(event, ['data_admin', 'platform_admin']);
   if (!admin) return response(403, { error: 'Data administrator access required' });
   try {
     const body = parseJson(event);

@@ -78,13 +78,15 @@ async function authenticatedUser(event) {
   return user?.id && user?.email ? user : null;
 }
 
-const ADMIN_ROLES = ['organization_leader', 'data_admin', 'content_admin', 'platform_admin'];
+const ADMIN_ROLES = ['data_admin', 'content_admin', 'platform_admin'];
 
 async function requireRoles(event, allowedRoles = ADMIN_ROLES) {
   const user = await authenticatedUser(event);
   if (!user) return null;
   const email = normalizeEmail(user.email);
-  const roles = await sb(`user_roles?or=(auth_user_id.eq.${encodeURIComponent(user.id)},normalized_email.eq.${encodeURIComponent(email)})&role=in.(${allowedRoles.join(',')})&select=role`);
+  let roles;
+  try { roles = await sb(`user_roles?or=(auth_user_id.eq.${encodeURIComponent(user.id)},normalized_email.eq.${encodeURIComponent(email)})&role=in.(${allowedRoles.join(',')})&is_active=eq.true&select=role`); }
+  catch { roles = await sb(`user_roles?or=(auth_user_id.eq.${encodeURIComponent(user.id)},normalized_email.eq.${encodeURIComponent(email)})&role=in.(${allowedRoles.join(',')})&select=role`); }
   if (!roles?.length) return null;
   return { user, email, roles: roles.map((item) => item.role) };
 }

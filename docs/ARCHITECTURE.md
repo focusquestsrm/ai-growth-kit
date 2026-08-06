@@ -22,14 +22,23 @@ Membership tiers do not confer administrative privileges. A valid administrative
 - `user_roles`: independently assigned administrative roles
 - `prompt_categories`, `prompts`, `prompt_questions`: internal content engine for Business Growth Categories and Tools
 - `business_profiles`: reusable member context
-- `prompt_generations`: Growth Activity
-- `saved_outputs`: Saved Strategies
+- `prompt_generations`: compact recent activity shown on the Dashboard
+- `saved_strategies`: canonical Saved Strategies repository
+- `saved_outputs`: legacy compatibility storage migrated into Saved Strategies
 - `favorite_tools`: member shortcuts
-- `business_health_assessments`: six-area snapshots and overall score
+- `assessment_versions`, `assessment_sections`, `assessment_questions`: versioned qualitative assessment configuration
+- `assessment_responses`, `assessment_results`, `assessment_recommendations`: private member responses, priority results, and tier-aware recommendations
+- `assessment_tool_mappings`: administrator-controlled section-to-tool recommendation rules
 - `platform_feedback`: ratings, suggestions, and issue reports
 - `import_batches`, `import_errors`, `audit_logs`: controlled administration and traceability
 
-The internal `prompt_*` names are retained as stable schema identifiers. Member-facing language uses Business Growth Tool, Business Growth Library, Generate Strategy, Business Growth Recommendations, Saved Strategies, and Growth Activity.
+The internal `prompt_*` names are retained as stable schema identifiers. Member-facing language uses Business Growth Tool, AI Business Tools, Generate Strategy, Business Growth Recommendations, Saved Strategies, Business Growth Assessment, and recent activity.
+
+## Navigation and routes
+
+Member navigation has five primary items: Dashboard, My Business, AI Business Tools, Opportunities, and Account. Nested desktop menus become mobile navigation sections. The SPA maps clean paths such as `/business/profile`, `/business/assessment`, `/strategies`, `/tools/:category`, and `/opportunities` back to the static application.
+
+Administrative destinations use `/admin/*`. Navigation visibility is derived from server-confirmed permissions, while every API independently enforces platform, content, or data authorization. Platform administrators also receive `/platform` and may render member-tier and role perspectives without mutating persisted access records.
 
 ## Member synchronization
 

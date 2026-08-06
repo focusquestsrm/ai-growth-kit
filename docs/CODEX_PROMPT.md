@@ -21,13 +21,13 @@ Build and maintain **The D9Network AI Business Growth Platform** as a polished, 
 - Group: Business Growth Category
 - Primary action: Generate Strategy or Generate Recommendations
 - Result: Business Growth Recommendations
-- History: Growth Activity
+- Recent activity: compact dashboard component only
 - Saved work: Saved Strategies
 
 Internal schema identifiers such as `prompts` may remain stable.
 
 ## Experience requirements
 
-Provide a personalized dashboard, expanded reusable Business Profile, tier-aware recommendations, tool favorites, Saved Strategies with duplicate/export, Growth Activity, feedback on every page, Business Health assessment, Opportunity Center roadmap, and a complete role-protected admin console. Use responsive, accessible layouts, clear loading/success/error/empty states, and restrained D9Network styling.
+Provide a personalized dashboard, expanded reusable Business Profile, tier-aware recommendations, tool favorites, editable Saved Strategies, compact recent activity, feedback on every page, a qualitative Business Growth Assessment, Opportunity Center roadmap, role-specific administration, and a platform-administrator view switcher. Use the centralized compact typography tokens and responsive, accessible layouts with clear loading, success, error, and empty states.
 
 See `PRODUCT_VISION.md` and `docs/ARCHITECTURE.md` for roadmap and implementation boundaries.

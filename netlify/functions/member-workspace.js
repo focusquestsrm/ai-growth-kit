@@ -9,9 +9,10 @@ exports.handler = async (event) => {
   try {
     if (event.httpMethod === 'GET') {
       const optional = async (request, fallback) => { try { return await request; } catch { return fallback; } };
+      const loadStrategies = async () => { try { return await sb(`saved_strategies?member_access_id=eq.${memberId}&select=id,title,strategy_text,input_payload,is_favorite,created_at,updated_at,prompts(title,slug)&order=updated_at.desc&limit=100`); } catch { const legacy = await sb(`saved_outputs?member_access_id=eq.${memberId}&select=id,title,output_text,input_payload,created_at,updated_at,prompts(title,slug)&order=updated_at.desc&limit=100`); return (legacy || []).map((item) => ({ ...item, strategy_text:item.output_text, is_favorite:false })); } };
       const [profile, outputs, generations, favorites, health] = await Promise.all([
         sb(`business_profiles?member_access_id=eq.${memberId}&select=*`),
-        sb(`saved_outputs?member_access_id=eq.${memberId}&select=id,title,output_text,input_payload,created_at,prompts(title,slug)&order=created_at.desc&limit=100`),
+        loadStrategies(),
         sb(`prompt_generations?member_access_id=eq.${memberId}&select=id,status,created_at,prompts(title,slug,prompt_categories(name))&order=created_at.desc&limit=20`),
         optional(sb(`favorite_tools?member_access_id=eq.${memberId}&select=prompt_id,created_at`), []),
         optional(sb(`business_health_assessments?member_access_id=eq.${memberId}&select=*&order=created_at.desc&limit=1`), [])
@@ -28,7 +29,9 @@ exports.handler = async (event) => {
         return response(200, { generation: created?.[0] });
       }
       if (!String(body.output_text || '').trim()) return response(400, { error: 'Output is required' });
-      const saved = await sb('saved_outputs', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ member_access_id: memberId, prompt_id: prompts[0].id, title: String(body.title || prompts[0].title).trim(), input_payload: body.input_payload || {}, output_text: String(body.output_text).trim() }) });
+      let saved;
+      try { saved = await sb('saved_strategies', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ member_access_id: memberId, prompt_id: prompts[0].id, title: String(body.title || prompts[0].title).trim(), input_payload: body.input_payload || {}, strategy_text: String(body.output_text).trim() }) }); }
+      catch { saved = await sb('saved_outputs', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ member_access_id: memberId, prompt_id: prompts[0].id, title: String(body.title || prompts[0].title).trim(), input_payload: body.input_payload || {}, output_text: String(body.output_text).trim() }) }); }
       return response(200, { output: saved?.[0] });
     }
     if (body.action === 'save_profile') {
@@ -41,15 +44,26 @@ exports.handler = async (event) => {
       return response(200, { profile: saved?.[0] });
     }
     if (body.action === 'delete_output') {
-      await sb(`saved_outputs?id=eq.${encodeURIComponent(body.id)}&member_access_id=eq.${memberId}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+      try { await sb(`saved_strategies?id=eq.${encodeURIComponent(body.id)}&member_access_id=eq.${memberId}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }); }
+      catch { await sb(`saved_outputs?id=eq.${encodeURIComponent(body.id)}&member_access_id=eq.${memberId}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }); }
       return response(200, { success: true });
     }
     if (body.action === 'duplicate_output') {
-      const rows = await sb(`saved_outputs?id=eq.${encodeURIComponent(body.id)}&member_access_id=eq.${memberId}&select=prompt_id,title,input_payload,output_text`);
+      let legacy=false,rows; try { rows = await sb(`saved_strategies?id=eq.${encodeURIComponent(body.id)}&member_access_id=eq.${memberId}&select=prompt_id,title,input_payload,strategy_text`); } catch { legacy=true; rows=await sb(`saved_outputs?id=eq.${encodeURIComponent(body.id)}&member_access_id=eq.${memberId}&select=prompt_id,title,input_payload,output_text`); if(rows?.[0])rows[0].strategy_text=rows[0].output_text; }
       if (rows?.length !== 1) return response(404, { error: 'Saved strategy not found' });
       const original = rows[0];
-      const saved = await sb('saved_outputs', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ ...original, member_access_id: memberId, title: `${original.title} (Copy)` }) });
+      const payload={ member_access_id:memberId,prompt_id:original.prompt_id,title:`${original.title} (Copy)`,input_payload:original.input_payload,[legacy?'output_text':'strategy_text']:original.strategy_text };
+      const saved = await sb(legacy?'saved_outputs':'saved_strategies', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(payload) });
       return response(200, { output: saved?.[0] });
+    }
+    if (body.action === 'update_strategy') {
+      const title = String(body.title || '').trim();
+      const strategyText = String(body.strategy_text || '').trim();
+      if (!body.id || !title || !strategyText) return response(400, { error: 'Strategy title and content are required' });
+      let saved; try { saved = await sb(`saved_strategies?id=eq.${encodeURIComponent(body.id)}&member_access_id=eq.${memberId}`, { method:'PATCH', headers:{ Prefer:'return=representation' }, body:JSON.stringify({ title, strategy_text:strategyText, is_favorite:Boolean(body.is_favorite), updated_at:new Date().toISOString() }) }); }
+      catch { saved = await sb(`saved_outputs?id=eq.${encodeURIComponent(body.id)}&member_access_id=eq.${memberId}`, { method:'PATCH', headers:{ Prefer:'return=representation' }, body:JSON.stringify({ title, output_text:strategyText, updated_at:new Date().toISOString() }) }); }
+      if (!saved?.length) return response(404, { error: 'Saved strategy not found' });
+      return response(200, { output:saved[0] });
     }
     if (body.action === 'set_favorite') {
       const prompts = await sb(`prompts?id=eq.${encodeURIComponent(body.prompt_id)}&status=eq.published&minimum_tier_rank=lte.${access.member.growth_kit_tier_rank}&select=id`);

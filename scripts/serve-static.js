@@ -8,5 +8,12 @@ http.createServer((request, response) => {
   const pathname = decodeURIComponent(new URL(request.url, `http://${request.headers.host}`).pathname);
   const file = path.resolve(root, `.${pathname === '/' ? '/index.html' : pathname}`);
   if (!file.startsWith(root)) { response.writeHead(403).end('Forbidden'); return; }
-  fs.readFile(file, (error, data) => { if (error) { response.writeHead(404).end('Not found'); return; } response.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' }).end(data); });
+  fs.readFile(file, (error, data) => {
+    if (!error) { response.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' }).end(data); return; }
+    if (path.extname(pathname)) { response.writeHead(404).end('Not found'); return; }
+    fs.readFile(path.join(root, 'index.html'), (indexError, index) => {
+      if (indexError) { response.writeHead(404).end('Not found'); return; }
+      response.writeHead(200, { 'Content-Type': types['.html'] }).end(index);
+    });
+  });
 }).listen(port, '127.0.0.1', () => console.log(`Static preview: http://127.0.0.1:${port}`));

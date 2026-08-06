@@ -16,5 +16,5 @@ test('member-facing verification never asks the member to select a tier', () => 
 });
 test('all required administrator roles are supported independently of tiers', () => {
   const { ADMIN_ROLES } = require('../netlify/functions/_shared');
-  assert.ok(['platform_admin','data_admin','content_admin'].every((role) => ADMIN_ROLES.includes(role)));
+  assert.deepEqual(ADMIN_ROLES, ['data_admin','content_admin','platform_admin']);
 });

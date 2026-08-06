@@ -15,13 +15,42 @@ test('uses the official product identity and footer', () => {
 });
 
 test('member experience contains every Sprint 2 workspace', () => {
-  ['page-dashboard','page-library','page-saved','page-history','page-profile','page-health','page-opportunities'].forEach((id) => assert.match(html, new RegExp(`id="${id}"`)));
+  ['page-dashboard','page-library','page-saved','page-profile','page-assessment','page-opportunities','page-settings','page-platform'].forEach((id) => assert.match(html, new RegExp(`id="${id}"`)));
+  assert.doesNotMatch(html, /id="page-history"/);
   assert.match(app, /duplicate_output/);
+  assert.match(app, /update_strategy/);
   assert.match(app, /set_favorite/);
   assert.match(app, /submit_feedback/);
-  assert.match(app, /save_health/);
+  assert.match(app, /Business Growth Assessment completed/);
 });
 
 test('regular member navigation never links to the Intelligence Dashboard', () => {
   assert.doesNotMatch(html, /data-page="intelligence/i);
+});
+
+test('member navigation is grouped into five primary destinations', () => {
+  ['Dashboard','My Business','AI Business Tools','Opportunities','Account'].forEach((label) => assert.ok(html.includes(label)));
+  assert.doesNotMatch(html, />Growth Activity</);
+  assert.match(html, /id="adminNav"[^>]*hidden/);
+  assert.match(html, /id="platformNav"[^>]*hidden/);
+});
+
+test('uses centralized compact typography tokens', () => {
+  const css = fs.readFileSync(path.join(root, 'public', 'styles.css'), 'utf8');
+  ['--type-page-title:36px','--type-dashboard-title:40px','--type-section:24px','--type-nav:14px','--type-control:16px'].forEach((token) => assert.ok(css.includes(token), `missing ${token}`));
+  assert.doesNotMatch(html, /style="[^"]*font-size/i);
+});
+
+test('Saved Strategies is the single editable generated-work repository', () => {
+  const workspace = fs.readFileSync(path.join(root, 'netlify', 'functions', 'member-workspace.js'), 'utf8');
+  assert.match(workspace, /saved_strategies\?member_access_id=eq\./);
+  assert.match(workspace, /body\.action === 'update_strategy'/);
+  ['Open','Duplicate','Export','Delete'].forEach((action) => assert.ok(html.includes(action) || app.includes(action)));
+  assert.doesNotMatch(html, /Saved Outputs|Saved Documents/i);
+});
+
+test('platform preview is isolated from persisted membership', () => {
+  assert.match(app, /state\.previewRank/);
+  assert.match(app, /Previewing the \$\{tierNames\[state\.previewRank\]\} member experience/);
+  assert.doesNotMatch(app, /set_member_access[^\n]+previewRank/);
 });

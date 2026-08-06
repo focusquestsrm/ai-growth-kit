@@ -4,11 +4,12 @@ The D9Network AI Business Growth Platform is a secure, member-facing SaaS applic
 
 ## Included capabilities
 
-- Personalized member dashboard with recommendations, recent work, next steps, and Business Health summary
+- Personalized member dashboard with assessment status, priorities, recommendations, recent work, and next actions
 - Tier-controlled Business Growth Library for Bronze, Silver, Gold, and Platinum members
 - Expanded Business Profile reused automatically by every Business Growth Tool
 - Saved Strategies with copy, duplicate, export, and delete actions
-- Favorite tools, Growth Activity, member feedback, and six-area Business Health assessment
+- Favorite tools, compact dashboard activity, member feedback, and the qualitative Business Growth Assessment
+- Five-item grouped member navigation, role-specific administration, and a platform-administrator view switcher
 - Opportunity Center roadmap for contracts, partnerships, supplier diversity, grants, and speaking opportunities
 - Role-protected admin console for tools, categories, administrators, members, usage, imports, and feedback
 - CSV/XLSX Brilliant Directories synchronization with validation and audit reporting
@@ -24,6 +25,7 @@ The D9Network AI Business Growth Platform is a secure, member-facing SaaS applic
    - `002_security_seed.sql`
    - `003_complete_growth_kit.sql`
    - `004_business_growth_platform.sql`
+   - `005_business_growth_assessment.sql`
 5. Run `npm run dev` for the Netlify development server.
 
 Required server environment variables:
@@ -41,7 +43,7 @@ The service-role/secret key is server-only and is not the same credential as the
 
 Member eligibility is matched by normalized email, Brilliant Directories `user_id`, and supported membership. Supported memberships are Bronze, Silver, Gold, and Platinum. `Bronze II (Claim)` and `Ambassador` records are ignored. Tool availability is determined on the server by membership rank.
 
-Administrative access is assigned separately through `user_roles`. Multiple administrators are supported across `platform_admin`, `content_admin`, `data_admin`, and `organization_leader`. A person may hold more than one role.
+Administrative access is assigned separately through `user_roles`. Multiple administrators are supported across `platform_admin`, `content_admin`, and `data_admin`. A person may hold more than one role.
 
 ## Member synchronization
 
