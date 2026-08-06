@@ -18,16 +18,18 @@ exports.handler = async (event) => {
   if (!admin) return response(403, { error: 'Administrator access required' });
   try {
     if (event.httpMethod === 'GET') {
-      const [prompts, categories, roles, imports, members, generations] = await Promise.all([
+      const optional = async (request, fallback) => { try { return await request; } catch { return fallback; } };
+      const [prompts, categories, roles, imports, members, generations, feedback] = await Promise.all([
         sb('prompts?select=*,prompt_categories(id,name,slug)&order=updated_at.desc'),
         sb('prompt_categories?select=*&order=sort_order.asc,name.asc'),
         sb(`user_roles?role=in.(${ADMIN_ROLES.join(',')})&select=id,email,normalized_email,role,organization_id,created_at&order=created_at.desc`),
         sb('import_batches?select=id,filename,uploaded_by,total_rows,accepted_rows,ignored_rows,rejected_rows,created_at&order=created_at.desc&limit=10'),
         sb('member_app_access?select=id,bd_user_id,email,first_name,last_name,company,growth_kit_tier,growth_kit_tier_rank,access_enabled,source_active,updated_at&order=updated_at.desc&limit=500'),
-        sb('prompt_generations?select=id,created_at,prompts(title)&order=created_at.desc&limit=1000')
+        sb('prompt_generations?select=id,created_at,prompts(title)&order=created_at.desc&limit=1000'),
+        optional(sb('platform_feedback?select=id,page,rating,feedback_type,comments,status,created_at,member_app_access(email)&order=created_at.desc&limit=100'), [])
       ]);
       const activeMembers = members?.filter((member) => member.access_enabled && member.source_active).length || 0;
-      return response(200, { admin: { email: admin.email, roles: admin.roles }, prompts, categories, roles, imports, members, generations,
+      return response(200, { admin: { email: admin.email, roles: admin.roles }, prompts, categories, roles, imports, members, generations, feedback,
         stats: { members: activeMembers, prompts: prompts?.length || 0, published: prompts?.filter((p) => p.status === 'published').length || 0, administrators: roles?.length || 0, generations: generations?.length || 0 }
       });
     }
@@ -43,7 +45,8 @@ exports.handler = async (event) => {
         user_prompt_template: String(item.user_prompt_template).trim(), form_schema: Array.isArray(item.form_schema) ? item.form_schema : [],
         minimum_tier_rank: TIER_RANKS[item.minimum_tier], estimated_minutes: Math.max(1, Number(item.estimated_minutes) || 10),
         tags: Array.isArray(item.tags) ? item.tags : [], is_featured: Boolean(item.is_featured), status: ['draft','published','archived'].includes(item.status) ? item.status : 'draft',
-        is_published: item.status === 'published', marketplace_upgrade_message: String(item.marketplace_upgrade_message || '').trim() || null, updated_at: new Date().toISOString() };
+        is_published: item.status === 'published', marketplace_upgrade_message: String(item.marketplace_upgrade_message || '').trim() || null,
+        output_format: String(item.output_format || '').trim() || null, updated_at: new Date().toISOString() };
       const path = item.id ? `prompts?id=eq.${encodeURIComponent(item.id)}` : 'prompts';
       const saved = await sb(path, { method: item.id ? 'PATCH' : 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(payload) });
       const promptId = saved?.[0]?.id || item.id;
@@ -90,6 +93,12 @@ exports.handler = async (event) => {
       if (!body.id || typeof body.enabled !== 'boolean') return response(400, { error: 'Member id and enabled state are required' });
       await sb(`member_app_access?id=eq.${encodeURIComponent(body.id)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ access_enabled: body.enabled, updated_at: new Date().toISOString() }) });
       await audit(admin, body.enabled ? 'member.enabled' : 'member.disabled', 'member_app_access', body.id);
+      return response(200, { success: true });
+    }
+    if (body.action === 'set_feedback_status') {
+      if (!body.id || !['new','reviewed','resolved'].includes(body.status)) return response(400, { error: 'Feedback id and status are required' });
+      await sb(`platform_feedback?id=eq.${encodeURIComponent(body.id)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: body.status }) });
+      await audit(admin, 'feedback.status_updated', 'platform_feedback', body.id, { status: body.status });
       return response(200, { success: true });
     }
     return response(400, { error: 'Unsupported action' });

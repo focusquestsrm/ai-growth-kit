@@ -1,90 +1,64 @@
-# D9Network AI Business Growth Kit
+# The D9Network AI Business Growth Platform
 
-A white-labeled, tier-aware prompt workspace for D9Network members, with a separate role-protected administration console. Membership tier controls prompt access; administrative roles control administration. Ordinary members never receive administrative access.
+The D9Network AI Business Growth Platform is a secure, member-facing SaaS application that turns guided business inputs and a reusable Business Profile into practical growth recommendations. It is separate from the D9Network Intelligence Dashboard; regular members cannot access that administrative product.
 
-## Features
+## Included capabilities
 
-- Supabase email/password authentication and one-time email/member-ID verification with imported tier derivation
-- Server-side prompt access for Bronze, Silver, Gold, and Platinum members
-- Responsive prompt library, saved outputs, guided prompt builder, server-recorded usage, and business profiles
-- Database-backed prompt and category management with draft, published, and archived workflow
-- Multiple administrators with data, content, platform, or organization-leader roles
-- Brilliant Directories CSV/XLSX preview and commit workflow
-- Email normalization, excluded-plan handling, duplicate reporting, and highest-tier resolution
-- Member access management, usage analytics, import history, row-level errors, and audit logs
+- Personalized member dashboard with recommendations, recent work, next steps, and Business Health summary
+- Tier-controlled Business Growth Library for Bronze, Silver, Gold, and Platinum members
+- Expanded Business Profile reused automatically by every Business Growth Tool
+- Saved Strategies with copy, duplicate, export, and delete actions
+- Favorite tools, Growth Activity, member feedback, and six-area Business Health assessment
+- Opportunity Center roadmap for contracts, partnerships, supplier diversity, grants, and speaking opportunities
+- Role-protected admin console for tools, categories, administrators, members, usage, imports, and feedback
+- CSV/XLSX Brilliant Directories synchronization with validation and audit reporting
+- Server-side membership authorization and Supabase authentication
 
-`Bronze II (Claim)` and `Ambassador` records are ignored during synchronization. Admin roles are assigned separately and never inferred from membership tier.
+## Local setup
 
-## Windows setup
+1. Install Node.js 20 or later.
+2. Run `npm install`.
+3. Copy `.env.example` to `.env` and provide your own values. Never commit `.env`.
+4. Apply the Supabase migrations in numeric order through the Supabase SQL Editor:
+   - `001_initial_schema.sql`
+   - `002_security_seed.sql`
+   - `003_complete_growth_kit.sql`
+   - `004_business_growth_platform.sql`
+5. Run `npm run dev` for the Netlify development server.
 
-```powershell
-cd C:\Users\danie
-git clone https://github.com/focusquestsrm/ai-growth-kit.git
-cd ai-growth-kit
-npm install
-Copy-Item .env.example .env
+Required server environment variables:
+
+```text
+SUPABASE_URL
+SUPABASE_ANON_KEY (or SUPABASE_PUBLISHABLE_KEY)
+SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_KEY)
+APP_BASE_URL
 ```
 
-Fill in `.env` with values from Supabase. The service-role key is used only by server-side Netlify Functions and must never be placed in browser code or committed.
+The service-role/secret key is server-only and is not the same credential as the anon/publishable key.
 
-```dotenv
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-APP_BASE_URL=http://localhost:8888
-```
+## Access model
 
-Apply all SQL migrations in order using the Supabase CLI or SQL editor:
+Member eligibility is matched by normalized email, Brilliant Directories `user_id`, and supported membership. Supported memberships are Bronze, Silver, Gold, and Platinum. `Bronze II (Claim)` and `Ambassador` records are ignored. Tool availability is determined on the server by membership rank.
 
-1. `supabase/migrations/001_initial_schema.sql`
-2. `supabase/migrations/002_security_seed.sql`
-3. `supabase/migrations/003_complete_growth_kit.sql`
+Administrative access is assigned separately through `user_roles`. Multiple administrators are supported across `platform_admin`, `content_admin`, `data_admin`, and `organization_leader`. A person may hold more than one role.
 
-Create Supabase Auth users for members who will sign in. Imports provision eligibility records; they do not create passwords.
+## Member synchronization
 
-Bootstrap the first platform administrator after creating their Auth user:
+Administrators upload CSV or XLSX exports through Member Synchronization. Files are limited to 5 MB and 10,000 data rows. The review step performs no database writes. Commit upserts eligible members, captures ignored/rejected/duplicate details, and records an audit trail. Duplicate normalized emails retain the highest eligible tier.
 
-```sql
-insert into user_roles(email, normalized_email, auth_user_id, role, organization_id)
-values ('admin@example.com', 'admin@example.com', 'SUPABASE_AUTH_USER_UUID', 'platform_admin', 'd9network');
-```
+## Checks
 
-Additional administrators can then be assigned from the admin console.
-
-## Run and verify
-
-```powershell
-npm run dev
+```bash
 npm test
 npm run build
+npm run check
 ```
 
-Local development is available at `http://localhost:8888` through Netlify Dev.
-The first `npm run dev` invocation downloads the pinned Netlify CLI through `npx`; the CLI is intentionally excluded from deploy dependencies to avoid shipping its development-only dependency tree.
+`npm run check` validates configuration names without displaying secret values.
 
-## API routes
+## Deployment
 
-- `POST /api/auth-session` — Supabase password or refresh-token exchange
-- `POST /api/member-eligibility` — authenticated email and BD user ID verification; tier is derived server-side
-- `GET /api/prompts-list` — authenticated, server-filtered published prompt catalog
-- `GET|POST /api/member-workspace` — profile, usage, and saved-output operations
-- `GET|POST /api/admin-console` — role-protected content, category, and role operations
-- `POST /api/admin-member-import` — role-protected CSV/XLSX preview and commit
-- `GET /api/health` — deployment and environment readiness
+Netlify publishes `public/` and exposes functions from `netlify/functions/`. API routes are mapped from `/api/*` before the single-page application fallback. Configure all four environment variables in Netlify for the relevant deploy contexts, then redeploy.
 
-All member and admin routes use a Supabase access token. Direct browser access to application tables is revoked; server functions use the service-role key after authenticating and authorizing each request.
-
-## Member import format
-
-The first worksheet or CSV must contain `user_id`, `email`, and `subscription_name`. Optional fields are `first_name`, `last_name`, `company`, `d9_affiliation`, and `active`. Aliases documented in the importer are accepted for the required columns.
-
-Files are limited to CSV/XLSX, 5 MB, and 10,000 data rows. Preview is required in the UI before commit. Duplicate normalized emails are reported, and the highest supported membership tier is retained.
-
-## Security notes
-
-- Never commit `.env`; it is ignored by Git.
-- Generic authentication and membership failures avoid leaking member records.
-- Membership verification is rate-limited per client instance.
-- UI visibility is not an authorization control; every protected API performs server-side checks.
-- Membership tier never grants an administrative role.
-- This application contains no member route to the separate Intelligence Dashboard.
+See [PRODUCT_VISION.md](PRODUCT_VISION.md) for the roadmap and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for technical boundaries.

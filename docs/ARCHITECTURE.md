@@ -1,41 +1,49 @@
 # Architecture
 
-## Experiences
+## Boundaries
 
-- **AI Growth Kit:** eligible Bronze, Silver, Gold, and Platinum members.
-- **Intelligence Dashboard:** organization leaders and authorized administrators only.
-- **Admin Console:** authorized data, content, and platform administrators.
+The D9Network AI Business Growth Platform is a static single-page member application backed by Netlify Functions and Supabase. The separate Intelligence Dashboard is administrative and is never exposed to ordinary members.
 
-All experiences may share one Supabase project, but route access and API authorization are separate.
+The browser handles presentation and guided data entry. Netlify Functions are the authorization boundary. Supabase stores membership access, roles, content, profiles, activity, saved strategies, favorites, assessments, feedback, imports, and audit events.
 
-## Data flow
+## Authorization
 
-1. Tina exports members from Brilliant Directories.
-2. Tina uploads CSV/XLSX through the leader/admin workflow.
-3. The importer validates and normalizes rows.
-4. `Bronze II (Claim)` and `Ambassador` are ignored.
-5. Bronze, Silver, Gold, and Platinum records are upserted into `member_app_access`.
-6. A member verifies with email and Brilliant Directories user ID; the server derives membership from the imported record.
-7. The server grants a session and returns only prompts within the member's tier.
+Authentication uses Supabase Auth access tokens. Functions validate tokens directly with Supabase and then perform one of two independent checks:
 
-## Authorization rule
+- Member access: one active `member_app_access` record matching normalized email or linked Auth user. The server supplies the authoritative tier rank.
+- Administrative access: one or more allowed `user_roles` records matching normalized email or linked Auth user.
 
-- `membership_tier_rank` controls prompt access.
-- `user_roles` controls admin and leader access.
-- A high membership tier never grants administrative privileges.
+Membership tiers do not confer administrative privileges. A valid administrative role does not invent member eligibility. Multiple administrators and multiple roles per person are supported.
 
-## Runtime boundaries
+## Data model
 
-The static member application authenticates through `auth-session`, which exchanges credentials with Supabase Auth. It stores the short-lived access token in session storage and sends it as a bearer token. Netlify Functions validate the token with Supabase Auth before using the service-role key for database access.
+- `membership_tiers`: Bronze through Platinum ranks and limits
+- `member_app_access`: normalized Brilliant Directories eligibility records
+- `user_roles`: independently assigned administrative roles
+- `prompt_categories`, `prompts`, `prompt_questions`: internal content engine for Business Growth Categories and Tools
+- `business_profiles`: reusable member context
+- `prompt_generations`: Growth Activity
+- `saved_outputs`: Saved Strategies
+- `favorite_tools`: member shortcuts
+- `business_health_assessments`: six-area snapshots and overall score
+- `platform_feedback`: ratings, suggestions, and issue reports
+- `import_batches`, `import_errors`, `audit_logs`: controlled administration and traceability
 
-Member verification binds the authenticated user to a single `member_app_access` record after email, Brilliant Directories user ID, source-active state, and enabled status match. Members never select or submit a tier. `prompts-list` filters published prompts using only the synchronized tier rank.
+The internal `prompt_*` names are retained as stable schema identifiers. Member-facing language uses Business Growth Tool, Business Growth Library, Generate Strategy, Business Growth Recommendations, Saved Strategies, and Growth Activity.
 
-The admin console independently queries `user_roles`. Supported administrative roles are `organization_leader`, `data_admin`, `content_admin`, and `platform_admin`; multiple assignments and multiple administrators are supported. Platform administrators manage role assignments. Data administrators synchronize members. Content administrators manage prompts and categories.
+## Member synchronization
 
-Direct `anon` and `authenticated` access to application tables is revoked. The service-role key exists only in the server environment.
+CSV/XLSX files are parsed only by the protected import function. Eligibility requires normalized email, Brilliant Directories user ID, and a supported membership. Bronze II (Claim) and Ambassador are ignored. Duplicate normalized emails resolve to the highest supported tier. The review action is read-only; commit performs the upsert and audit writes.
 
-## Import behavior
+## Extensibility
 
-The upload endpoint accepts CSV and XLSX files up to 5 MB and 10,000 rows. It validates the extension, MIME type, required headers, supported memberships, email shape, and required identifiers. `Bronze II (Claim)` and `Ambassador` are reported as ignored. Unsupported or incomplete records are rejected. Duplicate normalized emails are all reported, while the highest supported tier is selected for the upsert.
+The current model supports future modules without weakening access boundaries: Opportunity Center, Business Intelligence, Referral Network, Government Contracting, Partnership Discovery, Marketplace, AI Agents, and Executive Dashboard. These modules should consume authenticated server APIs and add their own explicit authorization rules.
 
-Preview performs no database writes. Commit upserts eligible members, stores the full exception report in `import_batches`, and writes an `audit_events` entry.
+## Security controls
+
+- Supabase service credentials stay in Netlify Functions only.
+- Data tables use row-level security and revoke direct browser access.
+- Every content, member, import, role, and feedback mutation is authorized server-side.
+- Member input is escaped before insertion into HTML.
+- API responses use no-store, content-type, origin, and referrer headers.
+- `.env` and secrets are excluded from version control.

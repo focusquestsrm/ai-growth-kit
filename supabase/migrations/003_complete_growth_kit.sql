@@ -1,4 +1,4 @@
--- Complete Growth Kit MVP. Safe to run after 001 and 002.
+-- Complete member platform foundation. Safe to run after 001 and 002.
 alter table public.member_app_access add column if not exists source_active boolean not null default true;
 
 alter table public.prompts add column if not exists status text;

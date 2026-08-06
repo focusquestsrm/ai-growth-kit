@@ -1,8 +1,8 @@
 {
-  "name": "d9network-ai-growth-kit",
-  "version": "0.1.0",
+  "name": "d9network-ai-business-growth-platform",
+  "version": "1.0.0",
   "private": true,
-  "description": "White-labeled D9Network AI Business Growth Kit",
+  "description": "The D9Network AI Business Growth Platform",
   "scripts": {
     "dev": "npx --yes netlify-cli@18.1.0 dev",
     "preview": "node scripts/serve-static.js",

@@ -1,0 +1,10 @@
+{
+  "name": "The D9Network AI Business Growth Platform",
+  "short_name": "D9 Business Growth",
+  "description": "AI-powered business strategy and growth resources for D9Network members.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f4ef",
+  "theme_color": "#10213e",
+  "icons": [{ "src": "/d9-logo.png", "sizes": "512x512", "type": "image/png" }]
+}
