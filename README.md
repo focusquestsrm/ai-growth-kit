@@ -59,6 +59,7 @@ npm run build
 ```
 
 Local development is available at `http://localhost:8888` through Netlify Dev.
+The first `npm run dev` invocation downloads the pinned Netlify CLI through `npx`; the CLI is intentionally excluded from deploy dependencies to avoid shipping its development-only dependency tree.
 
 ## API routes
 
