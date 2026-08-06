@@ -1,6 +1,6 @@
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
 
 const APP_ORIGIN = process.env.APP_BASE_URL || '*';
 const headers = {
@@ -38,14 +38,22 @@ function ignoredMembership(value) {
   return tier === 'bronze ii (claim)' || tier === 'ambassador';
 }
 
+function canAccessPrompt(memberRank, minimumTierRank) {
+  return Number.isInteger(Number(memberRank)) && Number.isInteger(Number(minimumTierRank)) && Number(memberRank) >= Number(minimumTierRank);
+}
+
+function filterPromptsByTier(prompts, memberRank) {
+  return (prompts || []).filter((prompt) => prompt.status === 'published' && canAccessPrompt(memberRank, prompt.minimum_tier_rank));
+}
+
 async function sb(path, options = {}) {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) throw new Error('Supabase is not configured');
+  const serviceHeaders = { apikey: SUPABASE_SERVICE_KEY, 'Content-Type': 'application/json' };
+  if (!String(SUPABASE_SERVICE_KEY).startsWith('sb_secret_')) serviceHeaders.Authorization = `Bearer ${SUPABASE_SERVICE_KEY}`;
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     ...options,
     headers: {
-      apikey: SUPABASE_SERVICE_KEY,
-      Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
-      'Content-Type': 'application/json',
+      ...serviceHeaders,
       ...(options.headers || {})
     }
   });
@@ -81,11 +89,20 @@ async function requireRoles(event, allowedRoles = ADMIN_ROLES) {
   return { user, email, roles: roles.map((item) => item.role) };
 }
 
+async function requireMember(event) {
+  const user = await authenticatedUser(event);
+  if (!user) return null;
+  const email = normalizeEmail(user.email);
+  const members = await sb(`member_app_access?or=(auth_user_id.eq.${encodeURIComponent(user.id)},normalized_email.eq.${encodeURIComponent(email)})&access_enabled=eq.true&source_active=eq.true&select=id,first_name,last_name,company,d9_affiliation,growth_kit_tier,growth_kit_tier_rank`);
+  if (!Array.isArray(members) || members.length !== 1) return null;
+  return { user, email, member: members[0] };
+}
+
 function parseJson(event) {
   try { return JSON.parse(event.body || '{}'); } catch { return null; }
 }
 
 module.exports = {
-  ADMIN_ROLES, authenticatedUser, ignoredMembership, normalizeEmail, normalizeMembership,
-  parseJson, preflight, requireRoles, response, sb
+  ADMIN_ROLES, authenticatedUser, canAccessPrompt, filterPromptsByTier, ignoredMembership, normalizeEmail, normalizeMembership,
+  parseJson, preflight, requireMember, requireRoles, response, sb
 };

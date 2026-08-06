@@ -37,7 +37,13 @@ exports.handler = async (event) => {
       accepted_rows: totals.accepted, ignored_rows: totals.ignored, rejected_rows: totals.rejected,
       details: { ignored: result.ignored, rejected: result.rejected, duplicates: result.duplicates }
     }) });
-    await sb('audit_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+    const errors = [
+      ...result.ignored.map((item) => ({ import_batch_id: batch?.[0]?.id, row_number: item.row, severity: 'ignored', code: 'excluded_membership', email: item.email || null, bd_user_id: item.bd_user_id || null, membership: item.membership || null, details: item })),
+      ...result.rejected.map((item) => ({ import_batch_id: batch?.[0]?.id, row_number: item.row, severity: 'error', code: item.reason, email: item.email || null, bd_user_id: item.bd_user_id || null, membership: item.membership || null, details: item })),
+      ...result.duplicates.map((item) => ({ import_batch_id: batch?.[0]?.id, row_number: item.rows?.[1] || null, severity: 'warning', code: 'duplicate_email', email: item.email, details: item }))
+    ];
+    if (errors.length) await sb('import_errors', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(errors) });
+    await sb('audit_logs', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
       actor_auth_user_id: admin.user.id, actor_email: admin.email, action: 'members.imported',
       entity_type: 'import_batch', entity_id: batch?.[0]?.id, details: totals
     }) });

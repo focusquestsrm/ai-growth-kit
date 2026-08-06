@@ -6,8 +6,12 @@ exports.handler = async (event) => {
   const body = parseJson(event);
   if (!body) return response(400, { error: 'Invalid request' });
   const url = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
-  const anon = process.env.SUPABASE_ANON_KEY;
-  if (!url || !anon) return response(503, { error: 'Authentication is not configured' });
+  const anon = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
+  if (!url || !anon) {
+    const missing = [!url && 'SUPABASE_URL', !anon && 'SUPABASE_ANON_KEY or SUPABASE_PUBLISHABLE_KEY'].filter(Boolean);
+    console.error('auth-session configuration missing', missing);
+    return response(503, { error: `Authentication is not configured. Missing: ${missing.join(', ')}` });
+  }
   const isRefresh = body.action === 'refresh';
   const payload = isRefresh ? { refresh_token: body.refresh_token } : { email: String(body.email || '').trim(), password: String(body.password || '') };
   if ((!isRefresh && (!payload.email || !payload.password)) || (isRefresh && !payload.refresh_token)) return response(400, { error: 'Sign-in details are required' });

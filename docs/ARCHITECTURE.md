@@ -15,7 +15,7 @@ All experiences may share one Supabase project, but route access and API authori
 3. The importer validates and normalizes rows.
 4. `Bronze II (Claim)` and `Ambassador` are ignored.
 5. Bronze, Silver, Gold, and Platinum records are upserted into `member_app_access`.
-6. A member verifies with email, Brilliant Directories user ID, and membership.
+6. A member verifies with email and Brilliant Directories user ID; the server derives membership from the imported record.
 7. The server grants a session and returns only prompts within the member's tier.
 
 ## Authorization rule
@@ -28,7 +28,7 @@ All experiences may share one Supabase project, but route access and API authori
 
 The static member application authenticates through `auth-session`, which exchanges credentials with Supabase Auth. It stores the short-lived access token in session storage and sends it as a bearer token. Netlify Functions validate the token with Supabase Auth before using the service-role key for database access.
 
-Member verification binds the authenticated user to a single `member_app_access` record after email, Brilliant Directories user ID, membership tier, and enabled status match. `prompts-list` ignores client-supplied tiers and filters published prompts using the synchronized tier rank.
+Member verification binds the authenticated user to a single `member_app_access` record after email, Brilliant Directories user ID, source-active state, and enabled status match. Members never select or submit a tier. `prompts-list` filters published prompts using only the synchronized tier rank.
 
 The admin console independently queries `user_roles`. Supported administrative roles are `organization_leader`, `data_admin`, `content_admin`, and `platform_admin`; multiple assignments and multiple administrators are supported. Platform administrators manage role assignments. Data administrators synchronize members. Content administrators manage prompts and categories.
 

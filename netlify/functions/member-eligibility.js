@@ -1,4 +1,4 @@
-const { authenticatedUser, normalizeEmail, normalizeMembership, parseJson, preflight, response, sb } = require('./_shared');
+const { authenticatedUser, normalizeEmail, parseJson, preflight, response, sb } = require('./_shared');
 
 const attempts = new Map();
 const WINDOW_MS = 15 * 60 * 1000;
@@ -23,12 +23,11 @@ exports.handler = async (event) => {
     const body = parseJson(event);
     const email = normalizeEmail(body?.email);
     const bdUserId = String(body?.user_id || '').trim();
-    const tier = normalizeMembership(body?.membership);
-    if (!email || !bdUserId || !tier || email !== normalizeEmail(user.email)) {
+    if (!email || !bdUserId || email !== normalizeEmail(user.email)) {
       return response(400, { eligible: false, error: 'We could not verify those membership details.' });
     }
 
-    const query = `member_app_access?normalized_email=eq.${encodeURIComponent(email)}&bd_user_id=eq.${encodeURIComponent(bdUserId)}&growth_kit_tier=eq.${tier[0]}&access_enabled=eq.true&select=id,first_name,last_name,company,growth_kit_tier,growth_kit_tier_rank`;
+    const query = `member_app_access?normalized_email=eq.${encodeURIComponent(email)}&bd_user_id=eq.${encodeURIComponent(bdUserId)}&access_enabled=eq.true&source_active=eq.true&select=id,first_name,last_name,company,growth_kit_tier,growth_kit_tier_rank`;
     const rows = await sb(query);
     if (!Array.isArray(rows) || rows.length !== 1) {
       return response(403, { eligible: false, error: 'We could not verify those membership details.' });

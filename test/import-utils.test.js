@@ -20,3 +20,9 @@ test('normalizes email and keeps the highest tier for duplicates', () => {
 test('rejects incomplete and unsupported rows', () => {
   const result = processRows([{ user_id: '', email: 'bad', subscription_name: 'Silver' }, { user_id: 2, email: 'x@example.com', subscription_name: 'Bronze Plus' }]); assert.equal(result.accepted.length, 0); assert.equal(result.rejected.length, 2);
 });
+test('maps the Brilliant Directories active field without deleting omitted members', () => {
+  const result = processRows([{ user_id: 4, email: 'inactive@example.com', subscription_name: 'Silver', active: 'No' }, { user_id: 5, email: 'active@example.com', subscription_name: 'Gold', active: 'Yes' }]);
+  assert.equal(result.accepted[0].source_active, false);
+  assert.equal(result.accepted[0].access_enabled, false);
+  assert.equal(result.accepted[1].source_active, true);
+});

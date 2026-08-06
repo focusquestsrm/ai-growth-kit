@@ -25,7 +25,7 @@ Build the D9Network AI Business Growth Kit as a separate member-facing applicati
 ## MVP scope
 
 - Professional D9Network member login and verification screen.
-- Verification requires email, Brilliant Directories user ID, and membership tier.
+- Verification requires email and Brilliant Directories user ID; membership tier is derived from the imported record.
 - Server validates all three fields against `member_app_access`.
 - Prompt library grouped by category and filtered by member tier.
 - Four tiers only: Bronze=1, Silver=2, Gold=3, Platinum=4.

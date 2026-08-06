@@ -4,14 +4,14 @@ A white-labeled, tier-aware prompt workspace for D9Network members, with a separ
 
 ## Features
 
-- Supabase email/password authentication and one-time member-record verification
+- Supabase email/password authentication and one-time email/member-ID verification with imported tier derivation
 - Server-side prompt access for Bronze, Silver, Gold, and Platinum members
-- Responsive prompt library, saved prompts, guided prompt builder, and session history
-- Database-backed prompt and category management with draft/published workflow
+- Responsive prompt library, saved outputs, guided prompt builder, server-recorded usage, and business profiles
+- Database-backed prompt and category management with draft, published, and archived workflow
 - Multiple administrators with data, content, platform, or organization-leader roles
 - Brilliant Directories CSV/XLSX preview and commit workflow
 - Email normalization, excluded-plan handling, duplicate reporting, and highest-tier resolution
-- Import and role/content audit events
+- Member access management, usage analytics, import history, row-level errors, and audit logs
 
 `Bronze II (Claim)` and `Ambassador` records are ignored during synchronization. Admin roles are assigned separately and never inferred from membership tier.
 
@@ -34,10 +34,11 @@ SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 APP_BASE_URL=http://localhost:8888
 ```
 
-Apply both SQL migrations in order using the Supabase CLI or SQL editor:
+Apply all SQL migrations in order using the Supabase CLI or SQL editor:
 
 1. `supabase/migrations/001_initial_schema.sql`
 2. `supabase/migrations/002_security_seed.sql`
+3. `supabase/migrations/003_complete_growth_kit.sql`
 
 Create Supabase Auth users for members who will sign in. Imports provision eligibility records; they do not create passwords.
 
@@ -64,16 +65,18 @@ The first `npm run dev` invocation downloads the pinned Netlify CLI through `npx
 ## API routes
 
 - `POST /api/auth-session` — Supabase password or refresh-token exchange
-- `POST /api/member-eligibility` — authenticated email, BD user ID, and tier verification
+- `POST /api/member-eligibility` — authenticated email and BD user ID verification; tier is derived server-side
 - `GET /api/prompts-list` — authenticated, server-filtered published prompt catalog
+- `GET|POST /api/member-workspace` — profile, usage, and saved-output operations
 - `GET|POST /api/admin-console` — role-protected content, category, and role operations
 - `POST /api/admin-member-import` — role-protected CSV/XLSX preview and commit
+- `GET /api/health` — deployment and environment readiness
 
 All member and admin routes use a Supabase access token. Direct browser access to application tables is revoked; server functions use the service-role key after authenticating and authorizing each request.
 
 ## Member import format
 
-The first worksheet or CSV must contain `user_id`, `email`, and `subscription_name`. Optional fields are `first_name`, `last_name`, `company`, and `d9_affiliation`. Aliases documented in the importer are accepted for the required columns.
+The first worksheet or CSV must contain `user_id`, `email`, and `subscription_name`. Optional fields are `first_name`, `last_name`, `company`, `d9_affiliation`, and `active`. Aliases documented in the importer are accepted for the required columns.
 
 Files are limited to CSV/XLSX, 5 MB, and 10,000 data rows. Preview is required in the UI before commit. Duplicate normalized emails are reported, and the highest supported membership tier is retained.
 
