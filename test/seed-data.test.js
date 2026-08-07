@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const migrations = ['003_complete_growth_kit.sql','004_business_growth_platform.sql','005_business_growth_assessment.sql','006_identity_administration.sql','007_business_profile_experience.sql','008_visual_growth_experience.sql'].map((name) => fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', name), 'utf8')).join('\n');
+const migrations = ['003_complete_growth_kit.sql','004_business_growth_platform.sql','005_business_growth_assessment.sql','006_identity_administration.sql','007_business_profile_experience.sql','008_visual_growth_experience.sql','010_context_aware_prompt_engine.sql'].map((name) => fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', name), 'utf8')).join('\n');
 const categories = ['profile-branding','marketing-content','sales-relationships','strategy-operations','opportunities-procurement','leadership-growth'];
 const requiredTools = [
   'Business Profile Enhancer','Elevator Pitch Creator','Tagline Generator','Social Media Post','Customer FAQ Builder','Ideal Customer Profile','Basic SWOT Analysis',
@@ -22,7 +22,7 @@ test('all six Business Growth Categories are represented', () => {
 });
 
 test('platform migrations add profiles, saved strategies, feedback, and assessment data', () => {
-  ['business_description','business_goals','favorite_tools','platform_feedback','saved_strategies','assessment_versions','assessment_sections','assessment_questions','assessment_responses','assessment_results','assessment_recommendations','output_format'].forEach((name) => assert.match(migrations, new RegExp(name)));
+  ['business_description','business_goals','favorite_tools','platform_feedback','saved_strategies','assessment_versions','assessment_sections','assessment_questions','assessment_responses','assessment_results','assessment_recommendations','output_format','context_fields','task_template','required_output','guardrails','prompt_version'].forEach((name) => assert.match(migrations, new RegExp(name)));
 });
 
 test('migrations contain no seeded members, profiles, strategies, responses, or feedback', () => {

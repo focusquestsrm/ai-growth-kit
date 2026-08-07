@@ -58,16 +58,21 @@ exports.handler = async (event) => {
     if (body.action === 'save_prompt') {
       if (!allowed(admin, 'admin.content.manage')) return response(403, { error: 'Content administrator access required' });
       const item = body.prompt || {};
-      if (!item.title || !item.slug || !item.description || !item.user_prompt_template || !TIER_RANKS[item.minimum_tier]) return response(400, { error: 'Prompt fields are incomplete' });
+      if (!item.title || !item.slug || !item.description || !item.task_template || !item.required_output || !item.guardrails || !TIER_RANKS[item.minimum_tier]) return response(400, { error: 'Prompt fields are incomplete' });
       const thumbnailUrl=String(item.thumbnail_url||'').trim();
       if(thumbnailUrl){try{if(!['http:','https:'].includes(new URL(thumbnailUrl).protocol))throw new Error();}catch{return response(400,{error:'Thumbnail URL must use http or https'});}}
+      const contextFields = (Array.isArray(item.context_fields) ? item.context_fields : String(item.context_fields || '').split(/[\n,]/)).map((field) => String(field).trim()).filter((field) => /^[a-z][a-z0-9_]*$/.test(field));
+      const promptVersion = String(item.prompt_version || '1.0').trim();
+      if (!/^\d+\.\d+$/.test(promptVersion)) return response(400, { error: 'Version must use a number such as 1.1' });
       const payload = { category_id: item.category_id || null, title: String(item.title).trim(), slug: String(item.slug).trim().toLowerCase(),
         description: String(item.description).trim(), system_prompt: String(item.system_prompt || '').trim() || null,
-        user_prompt_template: String(item.user_prompt_template).trim(), form_schema: Array.isArray(item.form_schema) ? item.form_schema : [],
+        user_prompt_template: String(item.user_prompt_template || item.task_template).trim(), form_schema: Array.isArray(item.form_schema) ? item.form_schema : [],
         minimum_tier_rank: TIER_RANKS[item.minimum_tier], estimated_minutes: Math.max(1, Number(item.estimated_minutes) || 10),
         tags: Array.isArray(item.tags) ? item.tags : [], is_featured: Boolean(item.is_featured), status: ['draft','published','archived'].includes(item.status) ? item.status : 'draft',
         is_published: item.status === 'published', marketplace_upgrade_message: String(item.marketplace_upgrade_message || '').trim() || null,
-        output_format: String(item.output_format || '').trim() || null, thumbnail_url:thumbnailUrl||null, thumbnail_type:['custom','category'].includes(item.thumbnail_type)?item.thumbnail_type:null, updated_at: new Date().toISOString() };
+        output_format: String(item.output_format || '').trim() || null, context_fields: contextFields, task_template: String(item.task_template || item.user_prompt_template).trim(),
+        required_output: String(item.required_output || item.output_format || '').trim(), guardrails: String(item.guardrails || '').trim(), prompt_version: promptVersion,
+        thumbnail_url:thumbnailUrl||null, thumbnail_type:['custom','category'].includes(item.thumbnail_type)?item.thumbnail_type:null, updated_at: new Date().toISOString() };
       const path = item.id ? `prompts?id=eq.${encodeURIComponent(item.id)}` : 'prompts';
       const saved = await sb(path, { method: item.id ? 'PATCH' : 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(payload) });
       const promptId = saved?.[0]?.id || item.id;

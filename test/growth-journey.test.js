@@ -9,6 +9,7 @@ const app = fs.readFileSync(path.join(root, 'public', 'app.js'), 'utf8');
 const css = fs.readFileSync(path.join(root, 'public', 'styles.css'), 'utf8');
 const promptsApi = fs.readFileSync(path.join(root, 'netlify', 'functions', 'prompts-list.js'), 'utf8');
 const workspaceApi = fs.readFileSync(path.join(root, 'netlify', 'functions', 'member-workspace.js'), 'utf8');
+const promptEngine = fs.readFileSync(path.join(root, 'public', 'prompt-engine.js'), 'utf8');
 
 test('dashboard hero uses approved copy, artwork, personalization, and live metrics', () => {
   assert.match(html, /Your Growth Journey/);
@@ -41,15 +42,15 @@ test('assessment recommendations preserve membership access', () => {
 });
 
 test('eligible tools assemble protected personalized prompts for copying', () => {
-  assert.match(app, /function assemblePersonalizedPrompt/);
-  assert.match(app, /prompt\.system_prompt/);
-  assert.match(app, /profileContext\(context\)/);
-  assert.match(app, /Guided Responses/);
-  assert.match(app, /Desired Output/);
+  assert.match(app, /D9PromptEngine\.assemble/);
+  assert.match(promptEngine, /TOOL-SPECIFIC INPUTS/);
+  assert.match(promptEngine, /REQUIRED OUTPUT/);
+  assert.doesNotMatch(promptEngine, /Guided Responses|Desired Output/);
   assert.match(app, /Copy AI Prompt/);
+  assert.match(app, /Build Prompt Preview/);
   assert.match(app, /AI Generation Coming Soon/);
   assert.match(promptsApi, /minimum_tier_rank=lte\.\$\{access\.tierRank\}/);
-  assert.match(promptsApi, /system_prompt,user_prompt_template,output_format/);
+  assert.match(promptsApi, /context_fields,task_template,required_output,guardrails,prompt_version/);
   assert.match(workspaceApi, /record_tool_use/);
   assert.match(workspaceApi, /prompt_copied/);
   assert.match(workspaceApi, /body\.action === 'save_output'/);
