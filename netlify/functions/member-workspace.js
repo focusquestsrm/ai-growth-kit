@@ -1,5 +1,13 @@
 const { parseJson, preflight, requireMember, response, sb } = require('./_shared');
 
+const INDUSTRIES = ['Accounting & Financial Services','Advertising, Marketing & Public Relations','Agriculture & Food Production','Arts, Entertainment & Media','Automotive & Transportation Services','Beauty, Personal Care & Wellness','Business Consulting & Professional Services','Childcare & Family Services','Construction & Skilled Trades','Consumer Products & Retail','Education & Training','Energy & Utilities','Engineering & Technical Services','Event Planning & Hospitality','Food & Beverage','Government & Public Sector Services','Healthcare & Medical Services','Home Services & Property Maintenance','Human Resources & Staffing','Information Technology & Cybersecurity','Insurance','Legal Services','Logistics, Distribution & Supply Chain','Manufacturing','Nonprofit & Community Services','Real Estate & Property Management','Restaurants & Catering','Security & Protective Services','Sports, Fitness & Recreation','Telecommunications','Travel & Tourism','Transportation & Delivery','Other'];
+const STAGES = ['Idea','Startup','Established','Scaling','Mature'];
+const GEOGRAPHIC_MARKETS = ['Local','Regional','Statewide','Multi-State','National','International','Online / Location-Independent'];
+const CHALLENGES = ['Marketing & Visibility','Finding New Customers','Increasing Sales','Access to Capital','Operations & Efficiency','Hiring & Talent','Government Contracting','Corporate Partnerships','Technology & Digital Transformation','Leadership & Strategy','Other'];
+const CERTIFICATIONS = ['Small Business / SBA-qualified','Minority Business Enterprise (MBE)','Women-Owned Small Business (WOSB)','Veteran-Owned / Service-Disabled Veteran-Owned','HUBZone','8(a) Business Development Program','Disadvantaged Business Enterprise (DBE)','State or Local Minority Business Certification','Other Certification','None','Not Sure'];
+const clean = (value) => String(value || '').trim() || null;
+const validUrl = (value) => { if (!value) return true; try { return ['http:','https:'].includes(new URL(value).protocol); } catch { return false; } };
+
 exports.handler = async (event) => {
   const pf = preflight(event, ['GET', 'POST', 'DELETE']);
   if (pf) return pf;
@@ -36,8 +44,27 @@ exports.handler = async (event) => {
     }
     if (body.action === 'save_profile') {
       const input = body.profile || {};
-      const allowed = ['business_name','website','industry','business_description','products','services','target_market','ideal_customer','business_goals','business_stage','geographic_market','social_media','certifications','minority_owned_status','small_business_status'];
-      const profile = Object.fromEntries(allowed.map((key) => [key, String(input[key] || '').trim() || null]));
+      const industry = clean(input.industry), stage = clean(input.business_stage), geographicMarket = clean(input.geographic_market), challenge = clean(input.primary_business_challenge);
+      if (!INDUSTRIES.includes(industry)) return response(400, { error: 'Select a valid Industry' });
+      if (stage && !STAGES.includes(stage)) return response(400, { error: 'Select a valid Business Stage' });
+      if (geographicMarket && !GEOGRAPHIC_MARKETS.includes(geographicMarket)) return response(400, { error: 'Select a valid Geographic Market' });
+      if (challenge && !CHALLENGES.includes(challenge)) return response(400, { error: 'Select a valid Primary Business Challenge' });
+      if (industry === 'Other' && !clean(input.other_industry_name)) return response(400, { error: 'Other Industry Name is required' });
+      if (challenge === 'Other' && !clean(input.other_business_challenge)) return response(400, { error: 'Other Business Challenge is required' });
+      const certifications = [...new Set(Array.isArray(input.business_certifications) ? input.business_certifications.map(clean).filter(Boolean) : [])];
+      if (certifications.some((value) => !CERTIFICATIONS.includes(value))) return response(400, { error: 'Select valid Business Certifications & Designations' });
+      if ((certifications.includes('None') || certifications.includes('Not Sure')) && certifications.length > 1) return response(400, { error: 'None and Not Sure cannot be combined with other certifications' });
+      if (certifications.includes('Other Certification') && !clean(input.other_certification_name)) return response(400, { error: 'Other Certification Name is required' });
+      const interested = clean(input.interested_in_certifications);
+      if (interested && !['Yes','No','Not Sure'].includes(interested)) return response(400, { error: 'Select a valid certification interest' });
+      const urlKeys = ['website','social_linkedin','social_facebook','social_instagram','social_x','social_other'];
+      if (urlKeys.some((key) => !validUrl(clean(input[key])))) return response(400, { error: 'Website and social links must use valid http or https URLs' });
+      const allowed = ['business_name','website','industry','other_industry_name','business_description','products','services','target_market','ideal_customer','business_goals','business_stage','geographic_market','primary_markets_served','markets_to_enter','primary_business_challenge','other_business_challenge','other_certification_name','interested_in_certifications','social_linkedin','social_facebook','social_instagram','social_x','social_other'];
+      const profile = Object.fromEntries(allowed.map((key) => [key, clean(input[key])]));
+      if (industry !== 'Other') profile.other_industry_name = null;
+      if (challenge !== 'Other') profile.other_business_challenge = null;
+      if (!certifications.includes('Other Certification')) profile.other_certification_name = null;
+      profile.business_certifications = certifications;
       profile.years_in_business = input.years_in_business === '' || input.years_in_business == null ? null : Math.max(0, Number(input.years_in_business) || 0);
       profile.member_access_id = memberId; profile.updated_at = new Date().toISOString();
       const saved = await sb('business_profiles?on_conflict=member_access_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify(profile) });
