@@ -11,6 +11,7 @@ exports.handler = async (event) => {
   if (pf) return pf;
   const admin = await requireAdmin(event, 'admin.imports.manage');
   if (!admin) return response(403, { error: 'Data administrator access required' });
+  if (admin.reviewMode) return response(403, { error:'Imports are disabled in Review Mode.' });
   try {
     if (await isReadOnlyImpersonation(event, admin)) return response(403, { error: 'Imports are disabled while viewing as another user' });
     const body = parseJson(event);

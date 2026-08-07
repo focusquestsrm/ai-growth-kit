@@ -1,12 +1,13 @@
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
+const crypto = require('node:crypto');
 const { resolveFirstName } = require('./_identity');
 
 const APP_ORIGIN = process.env.APP_BASE_URL || '*';
 const headers = {
   'Access-Control-Allow-Origin': APP_ORIGIN,
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Impersonation-Session, X-Preview-Tier',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Impersonation-Session, X-Preview-Tier, X-Review-Session',
   'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
   'Content-Type': 'application/json; charset=utf-8',
   'Cache-Control': 'no-store',
@@ -37,6 +38,37 @@ function preflight(event, allowed = ['GET', 'POST', 'PATCH', 'DELETE']) {
 }
 
 function normalizeEmail(value) { return String(value || '').trim().toLowerCase(); }
+function reviewModeEnabled() { return String(process.env.REVIEW_MODE || '').trim().toLowerCase() === 'true'; }
+function reviewSecret() { return process.env.REVIEW_MODE_SECRET || SUPABASE_SERVICE_KEY || ''; }
+function encodeReviewPart(value) { return Buffer.from(value).toString('base64url'); }
+function signReviewPayload(encoded) { return crypto.createHmac('sha256', reviewSecret()).update(encoded).digest('base64url'); }
+function createReviewSession(view, tierRank) {
+  if (!reviewModeEnabled() || !reviewSecret()) throw new Error('Review mode is not configured');
+  const payload = { v:1, view, tier_rank:tierRank || null, iat:Date.now(), exp:Date.now() + (8 * 60 * 60 * 1000) };
+  const encoded = encodeReviewPart(JSON.stringify(payload));
+  return `${encoded}.${signReviewPayload(encoded)}`;
+}
+function reviewSession(event) {
+  if (!reviewModeEnabled() || !reviewSecret()) return null;
+  const token = event.headers?.['x-review-session'] || event.headers?.['X-Review-Session'] || '';
+  const [encoded, signature, extra] = String(token).split('.');
+  if (!encoded || !signature || extra) return null;
+  const expected = signReviewPayload(encoded);
+  const suppliedBuffer = Buffer.from(signature), expectedBuffer = Buffer.from(expected);
+  if (suppliedBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(suppliedBuffer, expectedBuffer)) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
+    if (payload.v !== 1 || payload.exp <= Date.now() || !['member','admin'].includes(payload.view)) return null;
+    if (payload.view === 'member' && ![1,2,3,4].includes(payload.tier_rank)) return null;
+    return payload;
+  } catch { return null; }
+}
+async function configuredReviewMember() {
+  const id = String(process.env.REVIEW_MEMBER_ID || '').trim();
+  if (!id) return null;
+  const members = await sb(`member_app_access?id=eq.${encodeURIComponent(id)}&access_enabled=eq.true&source_active=eq.true&select=id,email,normalized_email,first_name,last_name,company,d9_affiliation,growth_kit_tier,growth_kit_tier_rank`);
+  return members?.[0] || null;
+}
 function normalizeMembership(value) {
   const tier = String(value || '').trim().toLowerCase();
   const map = { bronze: ['Bronze', 1], silver: ['Silver', 2], gold: ['Gold', 3], platinum: ['Platinum', 4] };
@@ -144,6 +176,20 @@ function previewTierRank(event, access) {
 }
 
 async function canUseMemberExperience(event) {
+  const review = reviewSession(event);
+  if (review) {
+    const member = await configuredReviewMember();
+    if (!member) return { allowed:false, statusCode:503, error:'The review account is not configured.' };
+    const requestedTier = event.headers?.['x-preview-tier'] || event.headers?.['X-Preview-Tier'];
+    const tierRank = review.view === 'admin' ? (normalizeMembership(requestedTier)?.[1] || 4) : review.tier_rank;
+    return {
+      allowed:true, reviewMode:true, reviewView:review.view, isPlatformAdmin:review.view === 'admin',
+      user:{ id:null, email:member.email, user_metadata:{ first_name:member.first_name, last_name:member.last_name } },
+      email:normalizeEmail(member.email), member, account:null, roles:review.view === 'admin' ? ['platform_admin'] : [],
+      identityProfile:member, firstName:resolveFirstName(member), tierRank,
+      ownerColumn:'member_access_id', ownerId:member.id
+    };
+  }
   const user = await authenticatedUser(event);
   if (!user) return { allowed: false, statusCode: 401, error: 'Please sign in to continue.' };
   await ensurePlatformOwner(user);
@@ -218,6 +264,19 @@ function hasPermission(permissionValues, required) {
 }
 
 async function requireAdmin(event, requiredPermission) {
+  const review = reviewSession(event);
+  if (review?.view === 'admin') {
+    const member = await configuredReviewMember();
+    if (!member) return null;
+    const permissions = new Set(['admin.*']);
+    if (!hasPermission(permissions, requiredPermission)) return null;
+    const email = normalizeEmail(member.email);
+    return {
+      reviewMode:true, user:{ id:null, email }, email,
+      account:{ id:null, auth_user_id:null, email, first_name:member.first_name, last_name:member.last_name, organization:member.company, account_type:'review', account_status:'active', membership_status:'member', simulated_tier:null, account_designation:'Review Administrator' },
+      assignments:[], roles:['platform_admin'], permissions
+    };
+  }
   const user = await authenticatedUser(event);
   if (!user) return null;
   await ensurePlatformOwner(user);
@@ -271,5 +330,5 @@ function parseJson(event) { try { return JSON.parse(event.body || '{}'); } catch
 module.exports = {
   ADMIN_ROLES, PLATFORM_ROLES, DEFAULT_ROLE_PERMISSIONS, audit, authenticatedUser, canAccessAdmin, canAccessPlatform, canAccessPrompt, canUseMemberExperience, filterPromptsByTier, hasRole, memberExperienceEligible,
   activateInvitation, ensurePlatformOwner, hasPermission, ignoredMembership, invitationRedirectUrl, inviteAuthUser, isReadOnlyImpersonation, normalizeEmail, normalizeMembership, parseJson, permissionSet,
-  preflight, requireAdmin, requireMember, requireRoles, resolvePreviewTierRank, response, sb
+  createReviewSession, preflight, requireAdmin, requireMember, requireRoles, resolvePreviewTierRank, response, reviewModeEnabled, reviewSession, sb
 };

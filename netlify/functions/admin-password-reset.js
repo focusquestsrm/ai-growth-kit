@@ -31,6 +31,7 @@ exports.handler = async (event) => {
   if (pf) return pf;
   const admin = await requireAdmin(event);
   if (!admin?.roles?.includes('platform_admin')) return response(403, { error:'Platform administrator access required' });
+  if (admin.reviewMode) return response(403, { error:'Password changes are disabled in Review Mode.' });
   if (event.headers?.['x-impersonation-session'] || event.headers?.['X-Impersonation-Session']) return response(403, { error:'Changes are disabled while viewing as another user' });
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) return response(503, { error:'Authentication administration is not configured' });
   const body = parseJson(event);

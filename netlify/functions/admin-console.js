@@ -50,7 +50,7 @@ exports.handler = async (event) => {
         canAudit ? optional(sb('audit_logs?select=*&order=created_at.desc&limit=100'), []) : Promise.resolve([])
       ]);
       const activeMembers = members?.filter((member) => member.access_enabled && member.source_active).length || 0;
-      await audit(admin, 'admin.accessed', 'admin_workspace', null, { path: event.path || '/admin/dashboard' });
+      if (!admin.reviewMode) await audit(admin, 'admin.accessed', 'admin_workspace', null, { path: event.path || '/admin/dashboard' });
       return response(200, { admin: { account: admin.account, roles: admin.roles, permission_values: [...admin.permissions], permissions: { platform:isPlatform, dashboard:canDashboard, content:canContent, data:canData, roles:canRoles, invitations:canInvite, audit:canAudit, reporting:canReport } }, prompts, categories, accounts, assignments, invitations, imports, members, generations, feedback, assessment: { versions:assessmentVersions, sections:assessmentSections, questions:assessmentQuestions, mappings:assessmentMappings, results:assessmentResults }, marketplace:{categories:marketplaceCategories,items:marketplaceItems}, audit_logs:auditLogs,
         stats: { members: activeMembers, prompts: prompts?.length || 0, published: prompts?.filter((p) => p.status === 'published').length || 0, administrators: assignments?.filter((item) => item.is_active && ['platform_admin','content_admin','data_admin','super_admin','admin','staff'].includes(item.role)).length || 0, generations: generations?.length || 0 }
       });
@@ -58,6 +58,7 @@ exports.handler = async (event) => {
 
     const body = parseJson(event);
     if (!body?.action) return response(400, { error: 'Action is required' });
+    if (admin.reviewMode) return response(403, { error:'Administrative changes are disabled in Review Mode.' });
     const impersonationId = event.headers?.['x-impersonation-session'] || event.headers?.['X-Impersonation-Session'];
     if (impersonationId && !['end_impersonation'].includes(body.action)) {
       const sessions = await sb(`impersonation_sessions?id=eq.${encodeURIComponent(impersonationId)}&actor_account_id=eq.${admin.account.id}&ended_at=is.null&select=id,is_read_only`);

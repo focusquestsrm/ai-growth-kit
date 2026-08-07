@@ -15,6 +15,8 @@ Authentication uses Supabase Auth access tokens. Functions validate tokens direc
 
 Membership tiers do not confer administrative privileges. A valid administrative role does not invent member eligibility. Multiple administrators and multiple roles per person are supported.
 
+Temporary V1 Review Mode is an environment-gated access/session layer in front of these same authorization rules. A signed, expiring review token contains only the selected tier or Admin view. Functions resolve `REVIEW_MEMBER_ID` server-side and always use that fixed `member_app_access.id` as the owner; the browser cannot choose an owner ID. Member Review writes remain attached to the designated member, while Review Admin data-changing operations are disabled because Review Mode is not production authentication. Setting `REVIEW_MODE=false` returns immediately to the unchanged Supabase Auth path.
+
 ## Data model
 
 - `membership_tiers`: Bronze through Platinum ranks and limits
@@ -37,6 +39,8 @@ Membership tiers do not confer administrative privileges. A valid administrative
 - `import_batches`, `import_errors`, `audit_logs`: controlled administration and traceability
 
 The internal `prompt_*` names are retained as stable schema identifiers. Member-facing language uses Business Growth Tool, AI Business Tools, Generate Strategy, Business Growth Recommendations, Saved Strategies, Business Growth Assessment, and recent activity.
+
+Member-owned records use `member_access_id` to reference `member_app_access.id`: Business Profile, prompt/tool activity, Saved Strategies, favorites, feedback, onboarding, assessment responses/results/recommendations, and derived dashboard personalization. Entitlements are calculated separately from the effective tier rank. Review Mode changes only that request-scoped effective rank, so changing views cannot create a profile, replace an assessment, move strategies, or update the member's stored tier.
 
 ## Navigation and routes
 
