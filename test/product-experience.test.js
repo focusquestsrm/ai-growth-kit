@@ -37,7 +37,8 @@ test('member navigation is grouped into five primary destinations', () => {
 
 test('uses centralized compact typography tokens', () => {
   const css = fs.readFileSync(path.join(root, 'public', 'styles.css'), 'utf8');
-  ['--type-page-title:36px','--type-dashboard-title:40px','--type-section:24px','--type-nav:14px','--type-control:16px'].forEach((token) => assert.ok(css.includes(token), `missing ${token}`));
+  ['--type-page-title:32px','--type-dashboard-title:32px','--type-section:22px','--type-card-title:18px','--type-nav:14px','--type-control:16px'].forEach((token) => assert.ok(css.includes(token), `missing ${token}`));
+  assert.match(css, /font-family:ui-sans-serif,system-ui,-apple-system/);
   assert.doesNotMatch(html, /style="[^"]*font-size/i);
 });
 
@@ -53,4 +54,11 @@ test('platform preview is isolated from persisted membership', () => {
   assert.match(app, /state\.previewRank/);
   assert.match(app, /Previewing the \$\{tierNames\[state\.previewRank\]\} member experience/);
   assert.doesNotMatch(app, /set_member_access[^\n]+previewRank/);
+});
+
+test('new accounts receive truthful empty states before profile completion', () => {
+  assert.ok(html.includes('Complete your profile to receive personalized recommendations.'));
+  assert.match(app, /No saved work yet\./);
+  assert.match(app, /No recent activity yet\./);
+  assert.doesNotMatch(app, /first_name:'Platform', last_name:'Administrator'/);
 });

@@ -64,3 +64,5 @@ npm run check
 Netlify publishes `public/` and exposes functions from `netlify/functions/`. API routes are mapped from `/api/*` before the single-page application fallback. Configure all four environment variables in Netlify for the relevant deploy contexts, then redeploy.
 
 See [PRODUCT_VISION.md](PRODUCT_VISION.md) for the roadmap and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for technical boundaries.
+
+The proposed Intelligence Dashboard shared-member integration is documented in [docs/SHARED_MEMBER_DATA_DESIGN.md](docs/SHARED_MEMBER_DATA_DESIGN.md). It is intentionally awaiting approval before implementation.

@@ -12,7 +12,7 @@ if (/next implementation slice/i.test(browserBundle)) throw new Error('Placehold
 if (!browserBundle.includes('The D9Network AI Business Growth Platform')) throw new Error('Official product identity is missing');
 if (/AI Business Growth Kit|AI Growth Kit/i.test(browserBundle)) throw new Error('Retired product identity found in the member application');
 if (/id=["']page-history["']/i.test(browserBundle)) throw new Error('Recent activity must remain on the Dashboard');
-if (!/--type-page-title:36px/.test(browserBundle) || !/--type-nav:14px/.test(browserBundle)) throw new Error('Central typography tokens are missing');
+if (!/--type-page-title:32px/.test(browserBundle) || !/--type-card-title:18px/.test(browserBundle) || !/--type-nav:14px/.test(browserBundle)) throw new Error('Central typography tokens are missing');
 const jsFiles = [...fs.readdirSync(path.join(root, 'netlify/functions')).filter((name) => name.endsWith('.js')).map((name) => `netlify/functions/${name}`), 'public/app.js', 'scripts/check-config.js', 'scripts/serve-static.js'];
 for (const file of jsFiles) { const check = spawnSync(process.execPath, ['--check', path.join(root, file)], { encoding: 'utf8' }); if (check.status !== 0) throw new Error(`${file} failed syntax validation:\n${check.stderr}`); }
 console.log(`Build validation passed (${required.length} assets, ${jsFiles.length} scripts).`);
