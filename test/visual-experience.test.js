@@ -21,7 +21,8 @@ test('approved dashboard artwork and shared visuals power the member experience'
 
 test('tool thumbnails follow custom, category, and generic fallback priority', () => {
   assert.match(app, /if\(item\?\.thumbnail_url\)return/);
-  assert.match(app, /category\.category_default_thumbnail\|\|category\.slug\|\|'general'/);
+  assert.match(app, /const categoryAsset=categoryThumbnailAssets\[key\]/);
+  assert.match(app, /return `<div class="category-thumbnail generic/);
   ['profile-branding','marketing-content','sales-relationships','strategy-operations','opportunities-procurement','leadership-growth'].forEach((slug) => assert.ok(app.includes(`'${slug}'`)));
   assert.match(prompts, /thumbnail_url,thumbnail_type/);
   assert.match(migration, /category_default_thumbnail/);

@@ -24,7 +24,7 @@ function calculateAssessment(sections, questions, mappings, answers, memberRank)
     candidates.slice(0,3).forEach((mapping) => {
       if (recommendations.some((item) => item.prompt_id === mapping.prompts.id)) return;
       const locked = Number(mapping.prompts.minimum_tier_rank) > Number(memberRank);
-      recommendations.push({ prompt_id: mapping.prompts.id, title: mapping.prompts.title, slug: mapping.prompts.slug, category: mapping.prompts.prompt_categories?.name || '', required_tier_rank: mapping.prompts.minimum_tier_rank, is_locked: locked, alternative_prompt_id: locked ? accessible?.prompts.id || null : null, alternative_title: locked ? accessible?.prompts.title || null : null, priority: sectionIndex + 1, reason: `Supports ${section.title}` });
+      recommendations.push({ prompt_id: mapping.prompts.id, title: mapping.prompts.title, slug: mapping.prompts.slug, thumbnail_url: mapping.prompts.thumbnail_url || null, thumbnail_type: mapping.prompts.thumbnail_type || null, prompt_categories: mapping.prompts.prompt_categories || null, category: mapping.prompts.prompt_categories?.name || '', required_tier_rank: mapping.prompts.minimum_tier_rank, is_locked: locked, alternative_prompt_id: locked ? accessible?.prompts.id || null : null, alternative_title: locked ? accessible?.prompts.title || null : null, priority: sectionIndex + 1, reason: `Supports ${section.title}` });
     });
   });
   const priorityTitles = priorities.map((section) => section.title);
