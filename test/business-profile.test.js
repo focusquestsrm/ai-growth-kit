@@ -9,6 +9,7 @@ const css = fs.readFileSync(path.join(root, 'public', 'styles.css'), 'utf8');
 const app = fs.readFileSync(path.join(root, 'public', 'app.js'), 'utf8');
 const api = fs.readFileSync(path.join(root, 'netlify', 'functions', 'member-workspace.js'), 'utf8');
 const migration = fs.readFileSync(path.join(root, 'supabase', 'migrations', '007_business_profile_experience.sql'), 'utf8');
+const visualMigration = fs.readFileSync(path.join(root, 'supabase', 'migrations', '008_visual_growth_experience.sql'), 'utf8');
 
 test('Business Profile uses the supplied visuals and compact responsive sections', () => {
   assert.match(html, /src="\/assets\/business-profile-hero\.png"/);
@@ -20,7 +21,7 @@ test('Business Profile uses the supplied visuals and compact responsive sections
 });
 
 test('searchable profile choices and conditional Other fields are accessible', () => {
-  ['industryOptions','geographicMarketOptions','businessChallengeOptions'].forEach((id) => assert.match(html, new RegExp(`list="${id}"`)));
+  ['industryOptions','geographicMarketOptions'].forEach((id) => assert.match(html, new RegExp(`list="${id}"`)));
   ['industryHelp','geographicMarketHelp','primaryBusinessChallengeHelp','otherIndustryHelp','otherCertificationHelp','otherBusinessChallengeHelp'].forEach((id) => assert.match(html, new RegExp(`aria-describedby="[^"]*${id}`)));
   assert.match(app, /validateProfileChoice/);
   assert.match(app, /field\.focus\(\)/);
@@ -46,10 +47,19 @@ test('obsolete profile fields are removed after preserving legacy values', () =>
 });
 
 test('new profile data is persisted and social links use URL inputs', () => {
-  ['primary_markets_served','markets_to_enter','primary_business_challenge','other_business_challenge','other_industry_name','other_certification_name','interested_in_certifications','social_linkedin','social_facebook','social_instagram','social_x','social_other'].forEach((name) => {
+  ['primary_markets_served','markets_to_enter','other_business_challenge','other_industry_name','other_certification_name','interested_in_certifications','social_linkedin','social_facebook','social_instagram','social_x','social_other'].forEach((name) => {
     assert.match(html, new RegExp(`name="${name}"`));
     assert.ok(api.includes(`'${name}'`), `API does not allow ${name}`);
     assert.match(migration, new RegExp(name));
   });
   assert.equal((html.match(/name="social_(?:linkedin|facebook|instagram|x|other)" type="url"/g) || []).length, 5);
+});
+
+test('Primary Business Challenge is a searchable structured multi-select', () => {
+  assert.equal((html.match(/name="primary_business_challenges"/g) || []).length, 11);
+  assert.match(html, /id="challengeSearch" type="search"/);
+  assert.match(html, /id="challengeChips"/);
+  assert.match(app, /selectedChallenges/);
+  assert.match(api, /profile\.primary_business_challenges = challenges/);
+  assert.match(visualMigration, /primary_business_challenges jsonb/);
 });

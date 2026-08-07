@@ -57,8 +57,8 @@ test('view-as-user is audited, read-only, and isolated from actual membership', 
 });
 
 test('new accounts receive truthful empty states before profile completion', () => {
-  assert.ok(html.includes('Complete your profile to receive personalized recommendations.'));
+  assert.ok(`${html}\n${app}`.includes('Complete your profile to receive personalized recommendations.'));
   assert.match(app, /No saved work yet\./);
-  assert.match(app, /No recent activity yet\./);
+  assert.match(app, /No saved strategies yet\./);
   assert.doesNotMatch(app, /first_name:'Platform', last_name:'Administrator'/);
 });

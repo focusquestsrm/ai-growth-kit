@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const migrations = ['003_complete_growth_kit.sql','004_business_growth_platform.sql','005_business_growth_assessment.sql','006_identity_administration.sql','007_business_profile_experience.sql'].map((name) => fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', name), 'utf8')).join('\n');
+const migrations = ['003_complete_growth_kit.sql','004_business_growth_platform.sql','005_business_growth_assessment.sql','006_identity_administration.sql','007_business_profile_experience.sql','008_visual_growth_experience.sql'].map((name) => fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', name), 'utf8')).join('\n');
 const categories = ['profile-branding','marketing-content','sales-relationships','strategy-operations','opportunities-procurement','leadership-growth'];
 const requiredTools = [
   'Business Profile Enhancer','Elevator Pitch Creator','Tagline Generator','Social Media Post','Customer FAQ Builder','Ideal Customer Profile','Basic SWOT Analysis',

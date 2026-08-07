@@ -46,7 +46,7 @@ async function assessmentDefinition() {
   const sections = await sb(`assessment_sections?version_id=eq.${version.id}&is_active=eq.true&select=id,slug,title,description,display_order&order=display_order.asc`);
   const ids = (sections || []).map((section) => section.id);
   const questions = ids.length ? await sb(`assessment_questions?section_id=in.(${ids.join(',')})&is_active=eq.true&select=id,section_id,question_text,answer_type,display_order&order=display_order.asc`) : [];
-  const mappings = ids.length ? await sb(`assessment_tool_mappings?section_id=in.(${ids.join(',')})&is_active=eq.true&select=section_id,priority,prompts(id,title,slug,minimum_tier_rank,prompt_categories(name))&order=priority.asc`) : [];
+  const mappings = ids.length ? await sb(`assessment_tool_mappings?section_id=in.(${ids.join(',')})&is_active=eq.true&select=section_id,priority,prompts(id,title,slug,minimum_tier_rank,thumbnail_url,thumbnail_type,prompt_categories(name,slug,category_default_thumbnail))&order=priority.asc`) : [];
   return { version, sections: sections || [], questions: questions || [], mappings: mappings || [] };
 }
 
@@ -69,7 +69,7 @@ exports.handler = async (event) => {
       let latest = null;
       if (responses?.[0]) {
         const results = await sb(`assessment_results?response_id=eq.${responses[0].id}&select=*`);
-        const recommendations = await sb(`assessment_recommendations?response_id=eq.${responses[0].id}&select=priority,is_locked,required_tier_rank,reason,prompts!assessment_recommendations_prompt_id_fkey(id,title,slug,prompt_categories(name)),alternative:prompts!assessment_recommendations_alternative_prompt_id_fkey(id,title,slug)&order=priority.asc`);
+        const recommendations = await sb(`assessment_recommendations?response_id=eq.${responses[0].id}&select=priority,is_locked,required_tier_rank,reason,prompts!assessment_recommendations_prompt_id_fkey(id,title,slug,thumbnail_url,thumbnail_type,prompt_categories(name,slug,category_default_thumbnail)),alternative:prompts!assessment_recommendations_alternative_prompt_id_fkey(id,title,slug)&order=priority.asc`);
         latest = { response: responses[0], result: results?.[0] || null, recommendations: recommendations || [] };
       }
       return response(200, { ...definition, mappings: undefined, latest });

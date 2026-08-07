@@ -28,6 +28,7 @@ The D9Network AI Business Growth Platform is a secure, member-facing SaaS applic
    - `005_business_growth_assessment.sql`
    - `006_identity_administration.sql`
    - `007_business_profile_experience.sql`
+   - `008_visual_growth_experience.sql`
 5. Run `npm run dev` for the Netlify development server.
 
 Required server environment variables:
