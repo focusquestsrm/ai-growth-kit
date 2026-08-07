@@ -1,4 +1,4 @@
-const { parseJson, preflight, requireMember, requireRoles, response, sb } = require('./_shared');
+const { parseJson, preflight, requireAdmin, requireMember, response, sb } = require('./_shared');
 
 const VALID_ANSWERS = ['yes', 'partially', 'no', 'not_applicable'];
 const ANSWER_WEIGHT = { yes: 0, partially: 1, no: 2, not_applicable: 0 };
@@ -56,7 +56,7 @@ exports.handler = async (event) => {
   let access = await requireMember(event);
   let platformPreview = false;
   if (!access) {
-    const platform = await requireRoles(event, ['platform_admin']);
+    const platform = await requireAdmin(event, 'admin.testing.impersonate');
     if (!platform) return response(403, { error: 'Member access required' });
     platformPreview = true;
     access = { member: { id:null, growth_kit_tier_rank:4 } };

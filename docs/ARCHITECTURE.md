@@ -11,7 +11,7 @@ The browser handles presentation and guided data entry. Netlify Functions are th
 Authentication uses Supabase Auth access tokens. Functions validate tokens directly with Supabase and then perform one of two independent checks:
 
 - Member access: one active `member_app_access` record matching normalized email or linked Auth user. The server supplies the authoritative tier rank.
-- Administrative access: one or more allowed `user_roles` records matching normalized email or linked Auth user.
+- Administrative access: an active `platform_accounts` identity plus active `platform_role_assignments`. Staff require explicit permissions; executive viewers and partner administrators can enter only their specifically authorized read-only or partner scopes.
 
 Membership tiers do not confer administrative privileges. A valid administrative role does not invent member eligibility. Multiple administrators and multiple roles per person are supported.
 
@@ -19,7 +19,11 @@ Membership tiers do not confer administrative privileges. A valid administrative
 
 - `membership_tiers`: Bronze through Platinum ranks and limits
 - `member_app_access`: normalized Brilliant Directories eligibility records
-- `user_roles`: independently assigned administrative roles
+- `platform_accounts`: master platform identity, account state, actual membership state, optional member link, and independent tier simulation
+- `platform_role_assignments`: independently assigned roles and permission scopes
+- `platform_invitations`: secure invitations without passwords
+- `impersonation_sessions`: audited, read-only super-administrator testing sessions
+- `user_roles`: legacy administrative assignments migrated by migration 006
 - `prompt_categories`, `prompts`, `prompt_questions`: internal content engine for Business Growth Categories and Tools
 - `business_profiles`: reusable member context
 - `prompt_generations`: compact recent activity shown on the Dashboard
@@ -38,11 +42,15 @@ The internal `prompt_*` names are retained as stable schema identifiers. Member-
 
 Member navigation has five primary items: Dashboard, My Business, AI Business Tools, Opportunities, and Account. Nested desktop menus become mobile navigation sections. The SPA maps clean paths such as `/business/profile`, `/business/assessment`, `/strategies`, `/tools/:category`, and `/opportunities` back to the static application.
 
-Administrative destinations use `/admin/*`. Navigation visibility is derived from server-confirmed permissions, while every API independently enforces platform, content, or data authorization. Platform administrators also receive `/platform` and may render member-tier and role perspectives without mutating persisted access records.
+Members authenticate at `/login`; administrators authenticate at `/admin/login`. Administrative destinations use `/admin/*` and load a separate workspace. The member client never requests the admin API and does not expose an admin-view selector. Navigation visibility is derived from server-confirmed permissions, while every API independently enforces a concrete permission. An unauthorized admin URL is redirected to the member dashboard without administrative data.
+
+The initial platform owner is bootstrapped only when the authenticated email matches the protected `PLATFORM_OWNER_EMAIL` setting. The configured first and last name are written to `platform_accounts`, and the role is written to `platform_role_assignments`. Password creation and reset remain entirely in Supabase Authentication.
 
 ## Member synchronization
 
 CSV/XLSX files are parsed only by the protected import function. Eligibility requires normalized email, Brilliant Directories user ID, and a supported membership. Bronze II (Claim) and Ambassador are ignored. Duplicate normalized emails resolve to the highest supported tier. The review action is read-only; commit performs the upsert and audit writes.
+
+The importer writes only membership eligibility and import/audit records. It cannot assign platform roles, alter internal accounts, update authentication, or turn non-member staff/test accounts into members. A future Intelligence Dashboard integration must resolve to the same `member_app_access`/`platform_accounts.member_access_id` identity boundary.
 
 ## Extensibility
 
@@ -52,7 +60,8 @@ The current model supports future modules without weakening access boundaries: O
 
 - Supabase service credentials stay in Netlify Functions only.
 - Data tables use row-level security and revoke direct browser access.
-- Every content, member, import, role, and feedback mutation is authorized server-side.
+- Every administrative read and mutation is authorized server-side and administrative access is audited.
+- View-as-user sessions are super-admin-only, persistent, audited, and read-only; authenticated passwords are never exposed.
 - Member input is escaped before insertion into HTML.
 - API responses use no-store, content-type, origin, and referrer headers.
 - `.env` and secrets are excluded from version control.

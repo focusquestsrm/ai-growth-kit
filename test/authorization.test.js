@@ -14,7 +14,8 @@ test('member-facing verification never asks the member to select a tier', () => 
   const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'index.html'), 'utf8');
   assert.doesNotMatch(html, /name=["']membership["']/i);
 });
-test('all required administrator roles are supported independently of tiers', () => {
-  const { ADMIN_ROLES } = require('../netlify/functions/_shared');
-  assert.deepEqual(ADMIN_ROLES, ['data_admin','content_admin','platform_admin']);
+test('administrative access roles are supported independently of membership tiers', () => {
+  const { ADMIN_ROLES, PLATFORM_ROLES } = require('../netlify/functions/_shared');
+  assert.deepEqual(ADMIN_ROLES, ['super_admin','admin','staff']);
+  assert.deepEqual(PLATFORM_ROLES, ['super_admin','admin','staff','executive_viewer','member','partner_admin','tester','read_only']);
 });

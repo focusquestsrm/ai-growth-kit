@@ -1,52 +1,62 @@
-const { ADMIN_ROLES, normalizeEmail, parseJson, preflight, requireRoles, response, sb } = require('./_shared');
+const { PLATFORM_ROLES, audit, hasPermission, inviteAuthUser, normalizeEmail, parseJson, preflight, requireAdmin, response, sb } = require('./_shared');
 
-const EDITOR_ROLES = ['content_admin', 'platform_admin'];
 const TIER_RANKS = { Bronze: 1, Silver: 2, Gold: 3, Platinum: 4 };
-const ROLE_VALUES = ['member', ...ADMIN_ROLES];
-
-async function audit(admin, action, entityType, entityId, details = {}) {
-  await sb('audit_logs', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
-    actor_auth_user_id: admin.user.id, actor_email: admin.email, action,
-    entity_type: entityType, entity_id: entityId || null, details
-  }) });
-}
+const ACCOUNT_TYPES = ['internal', 'member', 'partner', 'external_tester'];
+const ACCOUNT_STATUSES = ['invited', 'pending_activation', 'active', 'suspended', 'archived'];
+const MEMBERSHIP_STATUSES = ['member', 'non_member', 'pending', 'inactive'];
+const INVITABLE_ROLES = PLATFORM_ROLES.filter((role) => role !== 'super_admin');
+const allowed = (admin, permission) => hasPermission(admin.permissions, permission);
 
 exports.handler = async (event) => {
   const pf = preflight(event, ['GET', 'POST', 'PATCH', 'DELETE']);
   if (pf) return pf;
-  const admin = await requireRoles(event);
+  const admin = await requireAdmin(event);
   if (!admin) return response(403, { error: 'Administrator access required' });
   try {
     if (event.httpMethod === 'GET') {
-      const isPlatform = admin.roles.includes('platform_admin');
-      const canContent = isPlatform || admin.roles.includes('content_admin');
-      const canData = isPlatform || admin.roles.includes('data_admin');
+      const isPlatform = admin.roles.includes('super_admin');
+      const canContent = allowed(admin, 'admin.content.manage');
+      const canData = allowed(admin, 'admin.members.read');
+      const canDashboard = allowed(admin, 'admin.dashboard.read');
+      const canRoles = allowed(admin, 'admin.roles.manage');
+      const canInvite = allowed(admin, 'admin.invitations.manage');
+      const canAudit = allowed(admin, 'admin.audit.read');
+      const canReport = allowed(admin, 'admin.reporting.read');
       const optional = async (request, fallback) => { try { return await request; } catch { return fallback; } };
-      const [prompts, categories, roles, imports, members, generations, feedback, assessmentVersions, assessmentSections, assessmentQuestions, assessmentMappings, assessmentResults, auditLogs] = await Promise.all([
+      const [prompts, categories, accounts, assignments, invitations, imports, members, generations, feedback, assessmentVersions, assessmentSections, assessmentQuestions, assessmentMappings, assessmentResults, auditLogs] = await Promise.all([
         canContent || isPlatform ? sb('prompts?select=*,prompt_categories(id,name,slug)&order=updated_at.desc') : Promise.resolve([]),
         canContent || isPlatform ? sb('prompt_categories?select=*&order=sort_order.asc,name.asc') : Promise.resolve([]),
-        isPlatform ? optional(sb(`user_roles?role=in.(${ADMIN_ROLES.join(',')})&select=id,email,normalized_email,role,organization_id,is_active,assigned_by,assigned_at,last_login_at,created_at&order=created_at.desc`), []) : Promise.resolve([]),
+        canRoles || canInvite ? optional(sb('platform_accounts?select=id,email,first_name,last_name,organization,account_type,account_status,membership_status,simulated_tier,account_designation,created_at,updated_at&order=created_at.desc'), []) : Promise.resolve([]),
+        canRoles ? optional(sb('platform_role_assignments?select=id,account_id,role,permissions,scope,is_active,assigned_at&order=assigned_at.desc'), []) : Promise.resolve([]),
+        canInvite ? optional(sb('platform_invitations?select=id,email,first_name,last_name,role,permissions,account_type,account_status,membership_status,simulated_tier,auth_invited_at,accepted_at,created_at&order=created_at.desc&limit=100'), []) : Promise.resolve([]),
         canData ? sb('import_batches?select=id,filename,uploaded_by,total_rows,accepted_rows,ignored_rows,rejected_rows,created_at&order=created_at.desc&limit=10') : Promise.resolve([]),
         canData ? sb('member_app_access?select=id,bd_user_id,email,first_name,last_name,company,growth_kit_tier,growth_kit_tier_rank,access_enabled,source_active,updated_at&order=updated_at.desc&limit=500') : Promise.resolve([]),
-        sb('prompt_generations?select=id,created_at,prompts(title)&order=created_at.desc&limit=1000'),
+        canReport ? sb('prompt_generations?select=id,created_at,prompts(title)&order=created_at.desc&limit=1000') : Promise.resolve([]),
         canContent ? optional(sb('platform_feedback?select=id,page,rating,feedback_type,comments,status,created_at,member_app_access(email)&order=created_at.desc&limit=100'), []) : Promise.resolve([]),
         canContent ? optional(sb('assessment_versions?select=*&order=created_at.desc'), []) : Promise.resolve([]),
         canContent ? optional(sb('assessment_sections?select=*&order=display_order.asc'), []) : Promise.resolve([]),
         canContent ? optional(sb('assessment_questions?select=*&order=display_order.asc'), []) : Promise.resolve([]),
         canContent ? optional(sb('assessment_tool_mappings?select=*,prompts(id,title,minimum_tier_rank)&order=priority.asc'), []) : Promise.resolve([]),
         canContent ? optional(sb('assessment_results?select=improvement_areas,priority_ranking,created_at&order=created_at.desc&limit=1000'), []) : Promise.resolve([]),
-        isPlatform ? optional(sb('audit_logs?select=*&order=created_at.desc&limit=100'), []) : Promise.resolve([])
+        canAudit ? optional(sb('audit_logs?select=*&order=created_at.desc&limit=100'), []) : Promise.resolve([])
       ]);
       const activeMembers = members?.filter((member) => member.access_enabled && member.source_active).length || 0;
-      return response(200, { admin: { email: admin.email, roles: admin.roles, permissions: { platform:isPlatform, content:canContent, data:canData } }, prompts, categories, roles, imports, members, generations, feedback, assessment: { versions:assessmentVersions, sections:assessmentSections, questions:assessmentQuestions, mappings:assessmentMappings, results:assessmentResults }, audit_logs:auditLogs,
-        stats: { members: activeMembers, prompts: prompts?.length || 0, published: prompts?.filter((p) => p.status === 'published').length || 0, administrators: roles?.length || 0, generations: generations?.length || 0 }
+      await audit(admin, 'admin.accessed', 'admin_workspace', null, { path: event.path || '/admin/dashboard' });
+      return response(200, { admin: { account: admin.account, roles: admin.roles, permission_values: [...admin.permissions], permissions: { platform:isPlatform, dashboard:canDashboard, content:canContent, data:canData, roles:canRoles, invitations:canInvite, audit:canAudit, reporting:canReport } }, prompts, categories, accounts, assignments, invitations, imports, members, generations, feedback, assessment: { versions:assessmentVersions, sections:assessmentSections, questions:assessmentQuestions, mappings:assessmentMappings, results:assessmentResults }, audit_logs:auditLogs,
+        stats: { members: activeMembers, prompts: prompts?.length || 0, published: prompts?.filter((p) => p.status === 'published').length || 0, administrators: assignments?.filter((item) => item.is_active && ['super_admin','admin','staff'].includes(item.role)).length || 0, generations: generations?.length || 0 }
       });
     }
 
     const body = parseJson(event);
     if (!body?.action) return response(400, { error: 'Action is required' });
+    const impersonationId = event.headers?.['x-impersonation-session'] || event.headers?.['X-Impersonation-Session'];
+    if (impersonationId && !['end_impersonation'].includes(body.action)) {
+      const sessions = await sb(`impersonation_sessions?id=eq.${encodeURIComponent(impersonationId)}&actor_account_id=eq.${admin.account.id}&ended_at=is.null&select=id,is_read_only`);
+      if (!sessions?.[0]) return response(403, { error: 'The view-as-user session is invalid or expired' });
+      if (sessions[0].is_read_only) return response(403, { error: 'Changes are disabled while viewing as another user' });
+    }
     if (body.action === 'save_prompt') {
-      if (!admin.roles.some((role) => EDITOR_ROLES.includes(role))) return response(403, { error: 'Content administrator access required' });
+      if (!allowed(admin, 'admin.content.manage')) return response(403, { error: 'Content administrator access required' });
       const item = body.prompt || {};
       if (!item.title || !item.slug || !item.description || !item.user_prompt_template || !TIER_RANKS[item.minimum_tier]) return response(400, { error: 'Prompt fields are incomplete' });
       const payload = { category_id: item.category_id || null, title: String(item.title).trim(), slug: String(item.slug).trim().toLowerCase(),
@@ -67,7 +77,7 @@ exports.handler = async (event) => {
       return response(200, { prompt: saved?.[0] });
     }
     if (body.action === 'save_category') {
-      if (!admin.roles.some((role) => EDITOR_ROLES.includes(role))) return response(403, { error: 'Content administrator access required' });
+      if (!allowed(admin, 'admin.content.manage')) return response(403, { error: 'Content administrator access required' });
       const item = body.category || {};
       if (!item.name || !item.slug) return response(400, { error: 'Category name and slug are required' });
       const payload = { name: String(item.name).trim(), slug: String(item.slug).trim().toLowerCase(), description: String(item.description || '').trim() || null,
@@ -79,47 +89,87 @@ exports.handler = async (event) => {
       return response(200, { category: saved?.[0] });
     }
     if (body.action === 'delete_prompt' || body.action === 'delete_category') {
-      if (!admin.roles.some((role) => EDITOR_ROLES.includes(role))) return response(403, { error: 'Content administrator access required' });
+      if (!allowed(admin, 'admin.content.manage')) return response(403, { error: 'Content administrator access required' });
       if (!body.id) return response(400, { error: 'Record id is required' });
       const isPrompt = body.action === 'delete_prompt';
       await sb(`${isPrompt ? 'prompts' : 'prompt_categories'}?id=eq.${encodeURIComponent(body.id)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
       await audit(admin, isPrompt ? 'prompt.deleted' : 'category.deleted', isPrompt ? 'prompt' : 'prompt_category', body.id);
       return response(200, { success: true });
     }
-    if (body.action === 'add_role' || body.action === 'remove_role') {
-      if (!admin.roles.includes('platform_admin')) return response(403, { error: 'Platform administrator access required' });
-      const email = normalizeEmail(body.email);
-      if (!email || !ROLE_VALUES.includes(body.role) || body.role === 'member') return response(400, { error: 'Valid administrator email and role are required' });
-      if (body.action === 'add_role') await sb('user_roles?on_conflict=normalized_email,role,organization_id', {
-        method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ email, normalized_email: email, role: body.role, organization_id: body.organization_id || 'd9network', is_active:true, assigned_by:admin.email, assigned_at:new Date().toISOString() })
-      });
-      else await sb(`user_roles?normalized_email=eq.${encodeURIComponent(email)}&role=eq.${body.role}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
-      await audit(admin, `role.${body.action === 'add_role' ? 'assigned' : 'removed'}`, 'user_role', null, { email, role: body.role });
-      return response(200, { success: true });
+    if (body.action === 'invite_account') {
+      if (!allowed(admin, 'admin.invitations.manage')) return response(403, { error: 'Invitation permission required' });
+      const email = normalizeEmail(body.email), role = String(body.role || ''), accountType = String(body.account_type || ''), accountStatus = String(body.account_status || ''), membershipStatus = String(body.membership_status || '');
+      const simulatedTier = body.simulated_tier && body.simulated_tier !== 'none' ? body.simulated_tier : null;
+      const permissions = Array.isArray(body.permissions) ? body.permissions.filter((item) => /^admin\.[a-z_.]+$/.test(item)) : [];
+      if (!email || !INVITABLE_ROLES.includes(role) || !ACCOUNT_TYPES.includes(accountType) || !ACCOUNT_STATUSES.includes(accountStatus) || !MEMBERSHIP_STATUSES.includes(membershipStatus) || (simulatedTier && !TIER_RANKS[simulatedTier])) return response(400, { error: 'Complete every account and access selection' });
+      if (role === 'staff' && !permissions.length) return response(400, { error: 'Staff accounts require at least one explicit permission' });
+      const created = await sb('platform_invitations', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ email, normalized_email: email, first_name: String(body.first_name || '').trim() || null, last_name: String(body.last_name || '').trim() || null, role, permissions, account_type: accountType, account_status: accountStatus, membership_status: membershipStatus, simulated_tier: simulatedTier, invited_by: admin.account.id }) });
+      try {
+        await inviteAuthUser(email);
+        await sb(`platform_invitations?id=eq.${created?.[0]?.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ auth_invited_at: new Date().toISOString() }) });
+      } catch (error) {
+        await audit(admin, 'invitation.delivery_failed', 'platform_invitation', created?.[0]?.id, { role, account_type: accountType });
+        throw error;
+      }
+      await audit(admin, 'invitation.sent', 'platform_invitation', created?.[0]?.id, { role, account_type: accountType, membership_status: membershipStatus, simulated_tier: simulatedTier });
+      return response(200, { success: true, invitation_id: created?.[0]?.id });
+    }
+    if (body.action === 'set_role_active') {
+      if (!allowed(admin, 'admin.roles.manage')) return response(403, { error: 'Role-management permission required' });
+      if (!body.id || typeof body.active !== 'boolean') return response(400, { error: 'Role id and state are required' });
+      const targetRoles = await sb(`platform_role_assignments?id=eq.${encodeURIComponent(body.id)}&select=id,account_id,role`);
+      if (!targetRoles?.[0]) return response(404, { error: 'Role assignment not found' });
+      if (targetRoles[0].role === 'super_admin' && (!admin.roles.includes('super_admin') || (targetRoles[0].account_id === admin.account.id && body.active === false))) return response(403, { error: 'The platform owner role cannot be changed by this account' });
+      await sb(`platform_role_assignments?id=eq.${encodeURIComponent(body.id)}`, { method:'PATCH', headers:{ Prefer:'return=minimal' }, body:JSON.stringify({ is_active:body.active }) });
+      await audit(admin, body.active ? 'role.activated' : 'role.deactivated', 'platform_role_assignment', body.id);
+      return response(200, { success:true });
+    }
+    if (body.action === 'set_account') {
+      if (!allowed(admin, 'admin.members.manage')) return response(403, { error: 'Account-management permission required' });
+      if (!body.id) return response(400, { error: 'Account id is required' });
+      const protectedRoles = await sb(`platform_role_assignments?account_id=eq.${encodeURIComponent(body.id)}&role=eq.super_admin&is_active=eq.true&select=id`);
+      if (protectedRoles?.length && !admin.roles.includes('super_admin')) return response(403, { error: 'Only the platform owner can change a super administrator account' });
+      const changes = {};
+      if (ACCOUNT_STATUSES.includes(body.account_status)) changes.account_status = body.account_status;
+      if (MEMBERSHIP_STATUSES.includes(body.membership_status)) changes.membership_status = body.membership_status;
+      if (body.simulated_tier === 'none' || body.simulated_tier === null) changes.simulated_tier = null;
+      else if (TIER_RANKS[body.simulated_tier]) changes.simulated_tier = body.simulated_tier;
+      if (!Object.keys(changes).length) return response(400, { error: 'No valid account changes were provided' });
+      await sb(`platform_accounts?id=eq.${encodeURIComponent(body.id)}`, { method:'PATCH', headers:{ Prefer:'return=minimal' }, body:JSON.stringify({ ...changes, updated_at:new Date().toISOString() }) });
+      await audit(admin, 'account.updated', 'platform_account', body.id, changes);
+      return response(200, { success:true });
+    }
+    if (body.action === 'start_impersonation') {
+      if (!admin.roles.includes('super_admin')) return response(403, { error: 'Platform owner access required' });
+      if (body.target_account_id === admin.account.id || !PLATFORM_ROLES.includes(body.viewed_role) || (body.simulated_tier && !TIER_RANKS[body.simulated_tier])) return response(400, { error: 'Select a valid user, role, and tier' });
+      const target = await sb(`platform_accounts?id=eq.${encodeURIComponent(body.target_account_id)}&select=id,first_name,last_name`);
+      if (!target?.[0]) return response(404, { error: 'The selected account was not found' });
+      const session = await sb('impersonation_sessions', { method:'POST', headers:{ Prefer:'return=representation' }, body:JSON.stringify({ actor_account_id:admin.account.id, target_account_id:target[0].id, viewed_role:body.viewed_role, simulated_tier:body.simulated_tier || null, is_read_only:true }) });
+      await audit(admin, 'impersonation.started', 'impersonation_session', session?.[0]?.id, { target_account_id:target[0].id, viewed_role:body.viewed_role, simulated_tier:body.simulated_tier || null });
+      return response(200, { session: { id:session?.[0]?.id, target_name:[target[0].first_name,target[0].last_name].filter(Boolean).join(' '), viewed_role:body.viewed_role, simulated_tier:body.simulated_tier || null, read_only:true } });
+    }
+    if (body.action === 'end_impersonation') {
+      if (!admin.roles.includes('super_admin') || !body.id) return response(403, { error: 'Platform owner access required' });
+      await sb(`impersonation_sessions?id=eq.${encodeURIComponent(body.id)}&actor_account_id=eq.${admin.account.id}&ended_at=is.null`, { method:'PATCH', headers:{ Prefer:'return=minimal' }, body:JSON.stringify({ ended_at:new Date().toISOString(), ended_by:admin.account.id }) });
+      await audit(admin, 'impersonation.ended', 'impersonation_session', body.id);
+      return response(200, { success:true });
     }
     if (body.action === 'set_member_access') {
-      if (!admin.roles.some((role) => ['platform_admin','data_admin'].includes(role))) return response(403, { error: 'Data administrator access required' });
+      if (!allowed(admin, 'admin.members.manage')) return response(403, { error: 'Member-management permission required' });
       if (!body.id || typeof body.enabled !== 'boolean') return response(400, { error: 'Member id and enabled state are required' });
       await sb(`member_app_access?id=eq.${encodeURIComponent(body.id)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ access_enabled: body.enabled, updated_at: new Date().toISOString() }) });
       await audit(admin, body.enabled ? 'member.enabled' : 'member.disabled', 'member_app_access', body.id);
       return response(200, { success: true });
     }
     if (body.action === 'set_feedback_status') {
-      if (!admin.roles.some((role) => ['platform_admin','content_admin'].includes(role))) return response(403, { error: 'Content administrator access required' });
+      if (!allowed(admin, 'admin.feedback.manage')) return response(403, { error: 'Feedback-management permission required' });
       if (!body.id || !['new','reviewed','resolved'].includes(body.status)) return response(400, { error: 'Feedback id and status are required' });
       await sb(`platform_feedback?id=eq.${encodeURIComponent(body.id)}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: body.status }) });
       await audit(admin, 'feedback.status_updated', 'platform_feedback', body.id, { status: body.status });
       return response(200, { success: true });
     }
-    if (body.action === 'set_role_active') {
-      if (!admin.roles.includes('platform_admin')) return response(403, { error: 'Platform administrator access required' });
-      if (!body.id || typeof body.active !== 'boolean') return response(400, { error: 'Role id and state are required' });
-      await sb(`user_roles?id=eq.${encodeURIComponent(body.id)}`, { method:'PATCH', headers:{ Prefer:'return=minimal' }, body:JSON.stringify({ is_active:body.active }) });
-      await audit(admin, body.active ? 'role.activated' : 'role.deactivated', 'user_role', body.id);
-      return response(200, { success:true });
-    }
     if (['save_assessment_section','save_assessment_question','save_assessment_mapping'].includes(body.action)) {
-      if (!admin.roles.some((role) => ['platform_admin','content_admin'].includes(role))) return response(403, { error: 'Content administrator access required' });
+      if (!allowed(admin, 'admin.content.manage')) return response(403, { error: 'Content administrator access required' });
       const configs = {
         save_assessment_section: { table:'assessment_sections', item:body.section, allowed:['version_id','slug','title','description','display_order','is_active'] },
         save_assessment_question: { table:'assessment_questions', item:body.question, allowed:['section_id','question_text','answer_type','display_order','is_active'] },

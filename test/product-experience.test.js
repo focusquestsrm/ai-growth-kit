@@ -15,7 +15,7 @@ test('uses the official product identity and footer', () => {
 });
 
 test('member experience contains every Sprint 2 workspace', () => {
-  ['page-dashboard','page-library','page-saved','page-profile','page-assessment','page-opportunities','page-settings','page-platform'].forEach((id) => assert.match(html, new RegExp(`id="${id}"`)));
+  ['page-dashboard','page-library','page-saved','page-profile','page-assessment','page-opportunities','page-settings'].forEach((id) => assert.match(html, new RegExp(`id="${id}"`)));
   assert.doesNotMatch(html, /id="page-history"/);
   assert.match(app, /duplicate_output/);
   assert.match(app, /update_strategy/);
@@ -32,7 +32,7 @@ test('member navigation is grouped into five primary destinations', () => {
   ['Dashboard','My Business','AI Business Tools','Opportunities','Account'].forEach((label) => assert.ok(html.includes(label)));
   assert.doesNotMatch(html, />Growth Activity</);
   assert.match(html, /id="adminNav"[^>]*hidden/);
-  assert.match(html, /id="platformNav"[^>]*hidden/);
+  assert.doesNotMatch(html, /id="platformNav"|accountViewMode|Admin View/);
 });
 
 test('uses centralized compact typography tokens', () => {
@@ -50,10 +50,10 @@ test('Saved Strategies is the single editable generated-work repository', () => 
   assert.doesNotMatch(html, /Saved Outputs|Saved Documents/i);
 });
 
-test('platform preview is isolated from persisted membership', () => {
-  assert.match(app, /state\.previewRank/);
-  assert.match(app, /Previewing the \$\{tierNames\[state\.previewRank\]\} member experience/);
-  assert.doesNotMatch(app, /set_member_access[^\n]+previewRank/);
+test('view-as-user is audited, read-only, and isolated from actual membership', () => {
+  assert.match(app, /start_impersonation/);
+  assert.match(app, /Read only/);
+  assert.doesNotMatch(app, /set_member_access[^\n]+simulated_tier/);
 });
 
 test('new accounts receive truthful empty states before profile completion', () => {

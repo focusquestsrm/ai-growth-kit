@@ -9,7 +9,7 @@ The D9Network AI Business Growth Platform is a secure, member-facing SaaS applic
 - Expanded Business Profile reused automatically by every Business Growth Tool
 - Saved Strategies with copy, duplicate, export, and delete actions
 - Favorite tools, compact dashboard activity, member feedback, and the qualitative Business Growth Assessment
-- Five-item grouped member navigation, role-specific administration, and a platform-administrator view switcher
+- Five-item grouped member navigation and a completely separate role-specific administration workspace
 - Opportunity Center roadmap for contracts, partnerships, supplier diversity, grants, and speaking opportunities
 - Role-protected admin console for tools, categories, administrators, members, usage, imports, and feedback
 - CSV/XLSX Brilliant Directories synchronization with validation and audit reporting
@@ -26,6 +26,7 @@ The D9Network AI Business Growth Platform is a secure, member-facing SaaS applic
    - `003_complete_growth_kit.sql`
    - `004_business_growth_platform.sql`
    - `005_business_growth_assessment.sql`
+   - `006_identity_administration.sql`
 5. Run `npm run dev` for the Netlify development server.
 
 Required server environment variables:
@@ -35,6 +36,9 @@ SUPABASE_URL
 SUPABASE_ANON_KEY (or SUPABASE_PUBLISHABLE_KEY)
 SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_KEY)
 APP_BASE_URL
+PLATFORM_OWNER_EMAIL
+PLATFORM_OWNER_FIRST_NAME
+PLATFORM_OWNER_LAST_NAME
 ```
 
 The service-role/secret key is server-only and is not the same credential as the anon/publishable key.
@@ -43,7 +47,9 @@ The service-role/secret key is server-only and is not the same credential as the
 
 Member eligibility is matched by normalized email, Brilliant Directories `user_id`, and supported membership. Supported memberships are Bronze, Silver, Gold, and Platinum. `Bronze II (Claim)` and `Ambassador` records are ignored. Tool availability is determined on the server by membership rank.
 
-Administrative access is assigned separately through `user_roles`. Multiple administrators are supported across `platform_admin`, `content_admin`, and `data_admin`. A person may hold more than one role.
+Administrative access is assigned separately through `platform_accounts` and `platform_role_assignments`. The supported platform roles are `super_admin`, `admin`, `staff`, `executive_viewer`, `member`, `partner_admin`, `tester`, and `read_only`. Staff access requires explicit permission keys. Membership status and simulated tier are separate fields; simulation never changes a real membership record.
+
+Members sign in at `/login`. Authorized administrators sign in at `/admin/login`. Configure the three `PLATFORM_OWNER_*` values as protected environment variables, invite the platform owner through Supabase Authentication, and sign in once at `/admin/login`. That first authenticated sign-in creates the active internal `super_admin` account and stores the configured name in the database. No password is stored in source or environment configuration.
 
 ## Member synchronization
 

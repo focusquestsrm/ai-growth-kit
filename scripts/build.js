@@ -2,7 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const root = path.resolve(__dirname, '..');
-const required = ['public/index.html', 'public/styles.css', 'public/app.js', 'public/manifest.webmanifest', 'public/d9-logo.png', 'public/d9-logo-white.png', 'netlify/functions/auth-session.js', 'netlify/functions/member-eligibility.js', 'netlify/functions/prompts-list.js', 'netlify/functions/member-workspace.js', 'netlify/functions/assessment.js', 'netlify/functions/admin-console.js', 'netlify/functions/admin-member-import.js', 'netlify/functions/health.js', 'supabase/migrations/004_business_growth_platform.sql', 'supabase/migrations/005_business_growth_assessment.sql', 'PRODUCT_VISION.md'];
+const required = ['public/index.html', 'public/styles.css', 'public/app.js', 'public/manifest.webmanifest', 'public/d9-logo.png', 'public/d9-logo-white.png', 'netlify/functions/auth-session.js', 'netlify/functions/member-eligibility.js', 'netlify/functions/prompts-list.js', 'netlify/functions/member-workspace.js', 'netlify/functions/assessment.js', 'netlify/functions/admin-console.js', 'netlify/functions/admin-member-import.js', 'netlify/functions/health.js', 'supabase/migrations/004_business_growth_platform.sql', 'supabase/migrations/005_business_growth_assessment.sql', 'supabase/migrations/006_identity_administration.sql', 'PRODUCT_VISION.md'];
 const missing = required.filter((file) => !fs.existsSync(path.join(root, file)));
 if (missing.length) throw new Error(`Missing build assets: ${missing.join(', ')}`);
 const browserBundle = ['public/index.html', 'public/styles.css', 'public/app.js'].map((file) => fs.readFileSync(path.join(root, file), 'utf8')).join('\n');

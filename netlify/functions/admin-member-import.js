@@ -1,5 +1,5 @@
 const XLSX = require('xlsx');
-const { parseJson, preflight, requireRoles, response, sb } = require('./_shared');
+const { audit, isReadOnlyImpersonation, parseJson, preflight, requireAdmin, response, sb } = require('./_shared');
 const { COLUMN_ALIASES, processRows } = require('./import-utils');
 
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -9,9 +9,10 @@ const ALLOWED_TYPES = ['text/csv', 'application/csv', 'application/vnd.ms-excel'
 exports.handler = async (event) => {
   const pf = preflight(event, ['POST']);
   if (pf) return pf;
-  const admin = await requireRoles(event, ['data_admin', 'platform_admin']);
+  const admin = await requireAdmin(event, 'admin.imports.manage');
   if (!admin) return response(403, { error: 'Data administrator access required' });
   try {
+    if (await isReadOnlyImpersonation(event, admin)) return response(403, { error: 'Imports are disabled while viewing as another user' });
     const body = parseJson(event);
     if (!body?.file_base64 || !body?.filename) return response(400, { error: 'A CSV or XLSX file is required' });
     const extension = String(body.filename).toLowerCase().split('.').pop();
@@ -43,10 +44,7 @@ exports.handler = async (event) => {
       ...result.duplicates.map((item) => ({ import_batch_id: batch?.[0]?.id, row_number: item.rows?.[1] || null, severity: 'warning', code: 'duplicate_email', email: item.email, details: item }))
     ];
     if (errors.length) await sb('import_errors', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(errors) });
-    await sb('audit_logs', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
-      actor_auth_user_id: admin.user.id, actor_email: admin.email, action: 'members.imported',
-      entity_type: 'import_batch', entity_id: batch?.[0]?.id, details: totals
-    }) });
+    await audit(admin, 'members.imported', 'import_batch', batch?.[0]?.id, totals);
     return response(200, { imported: true, batch_id: batch?.[0]?.id, totals, ignored: result.ignored, rejected: result.rejected, duplicates: result.duplicates });
   } catch (error) {
     console.error('admin-member-import', error);
