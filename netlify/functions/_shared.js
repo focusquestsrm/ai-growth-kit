@@ -65,8 +65,13 @@ function reviewSession(event) {
 }
 async function configuredReviewMember() {
   const id = String(process.env.REVIEW_MEMBER_ID || '').trim();
-  if (!id) return null;
-  const members = await sb(`member_app_access?id=eq.${encodeURIComponent(id)}&access_enabled=eq.true&source_active=eq.true&select=id,email,normalized_email,first_name,last_name,company,d9_affiliation,growth_kit_tier,growth_kit_tier_rank`);
+  const email = normalizeEmail(process.env.REVIEW_MEMBER_EMAIL || process.env.INITIAL_PLATFORM_ADMIN_EMAIL);
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const filter = uuid.test(id)
+    ? `id=eq.${encodeURIComponent(id)}`
+    : (email ? `normalized_email=eq.${encodeURIComponent(email)}` : '');
+  if (!filter) return null;
+  const members = await sb(`member_app_access?${filter}&access_enabled=eq.true&source_active=eq.true&select=id,email,normalized_email,first_name,last_name,company,d9_affiliation,growth_kit_tier,growth_kit_tier_rank`);
   return members?.[0] || null;
 }
 function normalizeMembership(value) {
@@ -330,5 +335,5 @@ function parseJson(event) { try { return JSON.parse(event.body || '{}'); } catch
 module.exports = {
   ADMIN_ROLES, PLATFORM_ROLES, DEFAULT_ROLE_PERMISSIONS, audit, authenticatedUser, canAccessAdmin, canAccessPlatform, canAccessPrompt, canUseMemberExperience, filterPromptsByTier, hasRole, memberExperienceEligible,
   activateInvitation, ensurePlatformOwner, hasPermission, ignoredMembership, invitationRedirectUrl, inviteAuthUser, isReadOnlyImpersonation, normalizeEmail, normalizeMembership, parseJson, permissionSet,
-  createReviewSession, preflight, requireAdmin, requireMember, requireRoles, resolvePreviewTierRank, response, reviewModeEnabled, reviewSession, sb
+  configuredReviewMember, createReviewSession, preflight, requireAdmin, requireMember, requireRoles, resolvePreviewTierRank, response, reviewModeEnabled, reviewSession, sb
 };

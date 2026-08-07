@@ -1,4 +1,4 @@
-const { createReviewSession, parseJson, preflight, response, reviewModeEnabled } = require('./_shared');
+const { configuredReviewMember, createReviewSession, parseJson, preflight, response, reviewModeEnabled } = require('./_shared');
 
 const MEMBER_TIERS = { bronze:1, silver:2, gold:3, platinum:4 };
 
@@ -14,10 +14,10 @@ exports.handler = async (event) => {
   if (!isAdmin && !tierRank) return response(400, { error:'Select a valid review experience.' });
 
   try {
+    if (!await configuredReviewMember()) return response(503, { error:'The ABC Financial Solutions review account could not be found. Check the server-side Review Mode member configuration.' });
     const token = createReviewSession(isAdmin ? 'admin' : 'member', tierRank);
     return response(200, { token, view:isAdmin ? 'admin' : 'member', tier_rank:tierRank, label:isAdmin ? 'Admin' : `${selection[0].toUpperCase()}${selection.slice(1)}` });
   } catch {
-    return response(503, { error:'Review mode is not fully configured.' });
+    return response(503, { error:'Review Mode cannot connect to the configured review account.' });
   }
 };
-

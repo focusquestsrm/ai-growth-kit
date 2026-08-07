@@ -42,6 +42,7 @@ APP_BASE_URL
 INITIAL_PLATFORM_ADMIN_EMAIL
 REVIEW_MODE
 REVIEW_MEMBER_ID (required when REVIEW_MODE=true)
+REVIEW_MEMBER_EMAIL (optional fixed-member lookup fallback)
 REVIEW_MODE_SECRET (optional; uses the server-only Supabase service key when omitted)
 ```
 
@@ -49,7 +50,7 @@ The service-role/secret key is server-only and is not the same credential as the
 
 ### Temporary V1 Review Mode
 
-In Netlify, configure `REVIEW_MODE=true` and set `REVIEW_MEMBER_ID` to the existing `member_app_access.id` for the pre-populated ABC Financial Solutions review member, then deploy. The identifier is resolved only in server functions and is never supplied by the browser. Keeping the flag in Netlify rather than source control means either mode can be deployed without a code change.
+In Netlify, configure `REVIEW_MODE=true` and set `REVIEW_MEMBER_ID` to the existing `member_app_access.id` for the pre-populated ABC Financial Solutions review member, then deploy. `REVIEW_MEMBER_ID` must be the `member_app_access` UUID—not a company name, email address, placeholder, or Supabase Auth UUID. As a controlled fallback, the server can resolve `REVIEW_MEMBER_EMAIL`, then `INITIAL_PLATFORM_ADMIN_EMAIL`; browser input is never used for identity selection. Keeping the flag in Netlify rather than source control means either mode can be deployed without a code change.
 
 Reviewers choose Bronze, Silver, Gold, Platinum, or Admin. Member tiers use the existing server-side entitlement filters while profile, assessment, recommendations, saved strategies, tool activity, and onboarding continue to use the same review member ID. Tier selection never updates that member's stored membership. Admin Review is read-only for administrative mutations because Review Mode is not production authentication; the existing reporting and platform views remain available.
 

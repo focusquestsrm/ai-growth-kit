@@ -6,7 +6,7 @@ const path = require('node:path');
 test('review sessions use a fixed server-side member and simulated entitlement only', async () => {
   process.env.REVIEW_MODE = 'true';
   process.env.REVIEW_MODE_SECRET = 'test-only-review-signing-secret';
-  process.env.REVIEW_MEMBER_ID = '00000000-0000-0000-0000-000000000009';
+  process.env.REVIEW_MEMBER_ID = '00000000-0000-4000-8000-000000000009';
   process.env.SUPABASE_URL = 'https://example.supabase.co';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-test';
 
