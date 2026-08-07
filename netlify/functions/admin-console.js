@@ -6,6 +6,13 @@ const ACCOUNT_STATUSES = ['invited', 'pending_activation', 'active', 'suspended'
 const MEMBERSHIP_STATUSES = ['member', 'non_member', 'pending', 'inactive'];
 const INVITABLE_ROLES = PLATFORM_ROLES.filter((role) => role !== 'platform_admin');
 const allowed = (admin, permission) => hasPermission(admin.permissions, permission);
+function invitationDeliveryResponse(error) {
+  const detail = `${error.code || ''} ${error.message || ''}`.toLowerCase();
+  if (error.status === 429) return response(429, { error:'Invitation email limit reached. Please wait and try again.' });
+  if (/already|registered|exists|duplicate/.test(detail)) return response(409, { error:'An authentication account already exists for this email. Ask the user to sign in or reset their password.' });
+  console.error('invitation delivery failed', { status:error.status, code:error.code, message:error.message });
+  return response(502, { error:'The invitation could not be delivered. Check the Supabase email settings and try again.' });
+}
 
 exports.handler = async (event) => {
   const pf = preflight(event, ['GET', 'POST', 'PATCH', 'DELETE']);
@@ -129,15 +136,38 @@ exports.handler = async (event) => {
         await sb(`platform_invitations?id=eq.${created?.[0]?.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ auth_invited_at: new Date().toISOString() }) });
       } catch (error) {
         await audit(admin, 'invitation.delivery_failed', 'platform_invitation', created?.[0]?.id, { role, account_type: accountType });
-        await sb(`platform_invitations?normalized_email=eq.${encodeURIComponent(email)}&auth_invited_at=is.null&accepted_at=is.null`, { method:'DELETE', headers:{ Prefer:'return=minimal' } }).catch(() => null);
-        const detail = `${error.code || ''} ${error.message || ''}`.toLowerCase();
-        if (error.status === 429) return response(429, { error:'Invitation email limit reached. Please wait and try again.' });
-        if (/already|registered|exists|duplicate/.test(detail)) return response(409, { error:'An authentication account already exists for this email. Ask the user to sign in or reset their password.' });
-        console.error('invitation delivery failed', { status:error.status, code:error.code, message:error.message });
-        return response(502, { error:'The invitation could not be delivered. Check the Supabase email settings and try again.' });
+        return invitationDeliveryResponse(error);
       }
       await audit(admin, 'invitation.sent', 'platform_invitation', created?.[0]?.id, { role, account_type: accountType, membership_status: membershipStatus, simulated_tier: simulatedTier });
       return response(200, { success: true, invitation_id: created?.[0]?.id });
+    }
+    if (body.action === 'resend_invitation') {
+      if (!allowed(admin, 'admin.invitations.manage')) return response(403, { error:'Invitation permission required' });
+      if (!body.id) return response(400, { error:'Invitation id is required' });
+      const invitations = await sb(`platform_invitations?id=eq.${encodeURIComponent(body.id)}&select=id,email,role,accepted_at`);
+      const invitation = invitations?.[0];
+      if (!invitation) return response(404, { error:'Invitation not found' });
+      if (invitation.accepted_at) return response(409, { error:'Accepted invitations cannot be resent.' });
+      try {
+        await inviteAuthUser(invitation.email, invitation.role === 'member' ? '/login' : '/admin/login');
+      } catch (error) {
+        await audit(admin, 'invitation.resend_failed', 'platform_invitation', invitation.id, { role:invitation.role });
+        return invitationDeliveryResponse(error);
+      }
+      await sb(`platform_invitations?id=eq.${invitation.id}`, { method:'PATCH', headers:{ Prefer:'return=minimal' }, body:JSON.stringify({ auth_invited_at:new Date().toISOString() }) });
+      await audit(admin, 'invitation.resent', 'platform_invitation', invitation.id, { role:invitation.role });
+      return response(200, { success:true });
+    }
+    if (body.action === 'delete_invitation') {
+      if (!allowed(admin, 'admin.invitations.manage')) return response(403, { error:'Invitation permission required' });
+      if (!body.id) return response(400, { error:'Invitation id is required' });
+      const invitations = await sb(`platform_invitations?id=eq.${encodeURIComponent(body.id)}&select=id,email,role,auth_invited_at,accepted_at`);
+      const invitation = invitations?.[0];
+      if (!invitation) return response(404, { error:'Invitation not found' });
+      if (invitation.accepted_at || invitation.auth_invited_at) return response(409, { error:'Only invitations that failed before delivery can be removed.' });
+      await sb(`platform_invitations?id=eq.${invitation.id}`, { method:'DELETE', headers:{ Prefer:'return=minimal' } });
+      await audit(admin, 'invitation.deleted', 'platform_invitation', invitation.id, { email:invitation.email, role:invitation.role });
+      return response(200, { success:true });
     }
     if (body.action === 'set_role_active') {
       if (!allowed(admin, 'admin.roles.manage')) return response(403, { error: 'Role-management permission required' });

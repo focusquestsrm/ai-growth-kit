@@ -29,15 +29,26 @@ test('server reuses pending invitations and rejects sent or accepted duplicates'
   assert.match(admin, /already being processed/);
 });
 
-test('failed delivery records are removed and useful safe errors are returned', () => {
+test('failed delivery records remain retryable and useful safe errors are returned', () => {
   assert.match(admin, /invitation\.delivery_failed/);
-  assert.match(admin, /auth_invited_at=is\.null&accepted_at=is\.null/);
+  assert.match(admin, /body\.action === 'resend_invitation'/);
+  assert.match(admin, /body\.action === 'delete_invitation'/);
+  assert.match(admin, /Only invitations that failed before delivery can be removed/);
   assert.match(admin, /Invitation email limit reached/);
   assert.match(admin, /authentication account already exists/);
   assert.match(admin, /Supabase email settings/);
   assert.match(shared, /error\.status = res\.status/);
   assert.match(shared, /if \(baseUrl\) payload\.redirect_to/);
   assert.match(admin, /role === 'member' \? '\/login' : '\/admin\/login'/);
+});
+
+test('invitation administration displays status and wires retry and removal controls', () => {
+  assert.match(app, /function invitationRow\(item\)/);
+  assert.match(app, /data-resend-invitation/);
+  assert.match(app, /data-delete-invitation/);
+  assert.match(app, /action:'resend_invitation'/);
+  assert.match(app, /action:'delete_invitation'/);
+  assert.match(app, /Remove this failed invitation record/);
 });
 
 test('migration removes existing duplicates and enforces one invitation per email', () => {
