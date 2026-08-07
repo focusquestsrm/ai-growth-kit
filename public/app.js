@@ -109,22 +109,20 @@ const categoryThumbnailAssets=Object.freeze({
   'leadership-growth':'/assets/leadership-growth.png',
   'marketing-content':'/assets/marketing-content.png',
   'sales-relationships':'/assets/sales-relationships.png',
-  'profile-branding':'/assets/profile-branding.png'
+  'profile-branding':'/assets/profile-branding.png',
+  'opportunities-procurement':'/assets/opportunities-procurement.png'
 });
 const categoryThumbnailAliases=Object.freeze({
-  'strategy & operations':'strategy-operations',
-  'strategy and operations':'strategy-operations',
-  'leadership & growth':'leadership-growth',
-  'leadership and growth':'leadership-growth',
-  'marketing & content':'marketing-content',
-  'marketing and content':'marketing-content',
-  'sales & relationships':'sales-relationships',
-  'sales and relationships':'sales-relationships',
-  'profile & branding':'profile-branding',
-  'profile and branding':'profile-branding'
+  'strategy-and-operations':'strategy-operations',
+  'leadership-and-growth':'leadership-growth',
+  'marketing-and-content':'marketing-content',
+  'sales-and-relationships':'sales-relationships',
+  'profile-and-branding':'profile-branding',
+  'opportunities-and-procurement':'opportunities-procurement'
 });
 function iconSvg(key,extraClass=''){const path=visualIcons[key]||visualIcons.general;return `<svg class="visual-icon ${extraClass}" viewBox="0 0 120 80" role="img" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;}
-function categoryThumbnailKey(category={}){const configured=String(category.category_default_thumbnail||'').trim().toLowerCase(),slug=String(category.slug||'').trim().toLowerCase(),name=String(category.name||category.category||'').trim().toLowerCase();return categoryThumbnailAssets[configured]?configured:categoryThumbnailAssets[slug]?slug:categoryThumbnailAliases[name]||slug||configured||'general';}
+function normalizeCategoryKey(value){return String(value||'').trim().toLowerCase().replace(/&/g,' and ').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');}
+function categoryThumbnailKey(category={}){const candidates=[category.category_default_thumbnail,category.slug,category.category_slug,category.name,category.category];for(const candidate of candidates){const normalized=normalizeCategoryKey(candidate),canonical=categoryThumbnailAliases[normalized]||normalized;if(categoryThumbnailAssets[canonical])return canonical;}return'general';}
 function thumbnailImage(src,alt,compact,kind){return `<div class="category-thumbnail image ${kind} ${compact?'compact':''}"><img src="${escapeHtml(src)}" alt="${escapeHtml(alt)}" loading="lazy" decoding="async"></div>`;}
 function categoryThumbnail(item,compact=false){const category=item?.prompt_categories||item||{},key=categoryThumbnailKey(category),alt=`${item?.title||category.name||'Business Growth'} thumbnail`;if(item?.thumbnail_url)return thumbnailImage(item.thumbnail_url,alt,compact,'custom');const categoryAsset=categoryThumbnailAssets[key];if(categoryAsset)return thumbnailImage(categoryAsset,`${category.name||item?.category||'Business Growth'} category thumbnail`,compact,'mapped');return `<div class="category-thumbnail generic category-${escapeHtml(key)} ${compact?'compact':''}">${iconSvg(key)}<span>${escapeHtml(category.name||item?.category||'Business Growth')}</span></div>`;}
 const marketplaceCategories=[
