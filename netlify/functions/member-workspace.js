@@ -30,11 +30,12 @@ exports.handler = async (event) => {
     }
     const body = parseJson(event);
     if (!body?.action) return response(400, { error: 'Action is required' });
-    if (body.action === 'record_generation' || body.action === 'save_output') {
+    if (body.action === 'record_generation' || body.action === 'record_tool_use' || body.action === 'save_output') {
       const prompts = await sb(`prompts?id=eq.${encodeURIComponent(body.prompt_id)}&status=eq.published&minimum_tier_rank=lte.${access.tierRank}&select=id,title`);
       if (prompts?.length !== 1) return response(403, { error: 'Prompt access denied' });
-      if (body.action === 'record_generation') {
-        const created = await sb('prompt_generations', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ ...ownerPayload, prompt_id: prompts[0].id, input_payload: body.input_payload || {}, output_text: String(body.output_text || ''), status: 'completed' }) });
+      if (body.action === 'record_generation' || body.action === 'record_tool_use') {
+        const copiedOnly = body.action === 'record_tool_use';
+        const created = await sb('prompt_generations', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ ...ownerPayload, prompt_id: prompts[0].id, input_payload: body.input_payload || {}, output_text: copiedOnly ? null : String(body.output_text || ''), status: copiedOnly ? 'prompt_copied' : 'completed' }) });
         return response(200, { generation: created?.[0] });
       }
       if (!String(body.output_text || '').trim()) return response(400, { error: 'Output is required' });

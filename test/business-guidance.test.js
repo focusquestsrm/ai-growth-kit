@@ -30,9 +30,13 @@ test('guidance configuration contains the required contextual content', () => {
 });
 
 test('desktop guidance is compact and sticky while smaller layouts stack', () => {
-  assert.match(css, /\.my-business-layout\{display:grid;grid-template-columns:minmax\(0,1fr\) minmax\(300px,320px\)/);
+  assert.match(css, /\.my-business-layout\{grid-template-columns:minmax\(0,1fr\) minmax\(260px,280px\)/);
   assert.match(css, /\.guidance-sticky\{position:sticky/);
-  assert.match(css, /@media\(max-width:1180px\)\{\.my-business-layout\{grid-template-columns:1fr\}/);
-  assert.match(css, /@media\(max-width:700px\)[^{]*\{[^}]*\.business-guidance/);
-  assert.doesNotMatch(app, /guidance[^\n]*href=/i);
+  assert.match(css, /\.my-business-layout\.guidance-collapsed\{grid-template-columns:minmax\(0,1fr\) 48px\}/);
+  assert.match(css, /\.guidance-rail\{[^}]*writing-mode:vertical-rl/);
+  assert.match(app, /d9-growth-guidance-collapsed/);
+  assert.match(app, /\.slice\(0,2\)/);
+  assert.match(app, /function SponsoredBusinessSpotlight/);
+  ['advertiser_name','headline','description','image_url','destination_url','cta_text','start_date','end_date','placement','active','impressions','clicks'].forEach((field)=>assert.ok(app.includes(`'${field}'`)));
+  assert.match(app, /rel="sponsored noopener"/);
 });
