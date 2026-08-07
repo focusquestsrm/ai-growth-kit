@@ -41,6 +41,7 @@ test('obsolete profile fields are removed after preserving legacy values', () =>
   assert.doesNotMatch(html, /name="(?:minority_owned_status|small_business_status|social_media|certifications)"/);
   assert.doesNotMatch(api, /'minority_owned_status'|'small_business_status'|'social_media'|'certifications'/);
   assert.match(migration, /legacy_profile_data/);
+  ['social_media','certifications','minority_owned_status','small_business_status'].forEach((column) => assert.ok(migration.includes(`to_jsonb(profile)->>'${column}'`), `${column} migration is not safe when the legacy column is absent`));
   assert.match(migration, /drop column if exists minority_owned_status/);
 });
 

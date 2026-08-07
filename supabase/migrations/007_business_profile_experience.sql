@@ -17,34 +17,34 @@ alter table public.business_profiles add column if not exists other_business_cha
 alter table public.business_profiles add column if not exists legacy_profile_data jsonb not null default '{}'::jsonb;
 
 -- Preserve every retired free-text value before converting it to the new structure.
-update public.business_profiles
+update public.business_profiles as profile
 set legacy_profile_data = coalesce(legacy_profile_data, '{}'::jsonb) || jsonb_strip_nulls(jsonb_build_object(
-  'social_media', nullif(btrim(social_media), ''),
-  'certifications', nullif(btrim(certifications), ''),
-  'minority_owned_status', nullif(btrim(minority_owned_status), ''),
-  'small_business_status', nullif(btrim(small_business_status), '')
+  'social_media', nullif(btrim(to_jsonb(profile)->>'social_media'), ''),
+  'certifications', nullif(btrim(to_jsonb(profile)->>'certifications'), ''),
+  'minority_owned_status', nullif(btrim(to_jsonb(profile)->>'minority_owned_status'), ''),
+  'small_business_status', nullif(btrim(to_jsonb(profile)->>'small_business_status'), '')
 ));
 
 -- Keep recognized URLs in the new Other social link while retaining all originals above.
-update public.business_profiles
-set social_other = btrim(social_media)
-where social_other is null and social_media ~* '^https?://[^[:space:]]+$';
+update public.business_profiles as profile
+set social_other = btrim(to_jsonb(profile)->>'social_media')
+where social_other is null and (to_jsonb(profile)->>'social_media') ~* '^https?://[^[:space:]]+$';
 
 -- Map previous certification fields to structured selections when their meaning is clear.
-update public.business_profiles
+update public.business_profiles as profile
 set business_certifications = business_certifications || jsonb_build_array('Small Business / SBA-qualified')
-where coalesce(small_business_status, '') ~* '(yes|certif|qualified|small business|sba)'
+where coalesce(to_jsonb(profile)->>'small_business_status', '') ~* '(yes|certif|qualified|small business|sba)'
   and not business_certifications ? 'Small Business / SBA-qualified';
 
-update public.business_profiles
+update public.business_profiles as profile
 set business_certifications = business_certifications || jsonb_build_array('Minority Business Enterprise (MBE)')
-where coalesce(minority_owned_status, '') ~* '(yes|certif|minority|mbe)'
+where coalesce(to_jsonb(profile)->>'minority_owned_status', '') ~* '(yes|certif|minority|mbe)'
   and not business_certifications ? 'Minority Business Enterprise (MBE)';
 
-update public.business_profiles
+update public.business_profiles as profile
 set business_certifications = business_certifications || jsonb_build_array('Other Certification'),
-    other_certification_name = btrim(certifications)
-where nullif(btrim(certifications), '') is not null
+    other_certification_name = btrim(to_jsonb(profile)->>'certifications')
+where nullif(btrim(to_jsonb(profile)->>'certifications'), '') is not null
   and not business_certifications ? 'Other Certification';
 
 -- Retain a valid catalog industry. Unmapped free text becomes the explicit Other value.
