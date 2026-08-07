@@ -12,7 +12,7 @@ const migration = fs.readFileSync(path.join(root, 'supabase', 'migrations', '008
 
 test('approved dashboard artwork and shared visuals power the member experience', () => {
   ['heroGraphic','categoryThumbnail','progressRing','statusCard','assessmentSectionCard'].forEach((name) => assert.match(app, new RegExp(`function ${name}`)));
-  ['dashboardWelcome','dashboardToolsMetric','dashboardStrategiesMetric','dashboardAssessmentMetric','profileCompletion','growthPriorities','opportunityGraphic'].forEach((id) => assert.match(html, new RegExp(`id="${id}"`)));
+  ['dashboardWelcome','dashboardToolsMetric','dashboardStrategiesMetric','dashboardAssessmentMetric','profileCompletion','growthPriorities','dashboardMarketplace'].forEach((id) => assert.match(html, new RegExp(`id="${id}"`)));
   assert.match(html, /src="\/assets\/digital-growth-hero\.png"/);
   assert.doesNotMatch(html, /id="dashboardHeroGraphic"|id="welcomeTitle"|id="promptCount"/);
   assert.match(app, /profileCompletionPercent/);
@@ -32,7 +32,7 @@ test('assessment is a ten-area guided step experience with real progress', () =>
   ['assessmentProgress','assessmentOverview','assessmentBack','assessmentNext','assessmentSubmit'].forEach((id) => assert.match(html, new RegExp(`id="${id}"`)));
   assert.match(app, /Section \$\{state\.assessmentStep\+1\} of \$\{sections\.length\}/);
   assert.match(app, /answered\/questions\.length/);
-  ['Key Strengths','Areas for Improvement','Top 3 Growth Priorities','Suggested 30-Day Actions','Suggested 90-Day Actions','Recommended AI Business Tools'].forEach((label) => assert.ok(app.includes(label)));
+  ['Key Strengths','Areas for Improvement','Top 3 Growth Priorities','Suggested 30-Day Actions','Suggested 90-Day Actions','Included AI Business Tools for Your Priorities'].forEach((label) => assert.ok(app.includes(label)));
 });
 
 test('profile spacing uses the requested compact rhythm', () => {

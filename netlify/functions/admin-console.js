@@ -23,7 +23,7 @@ exports.handler = async (event) => {
       const canAudit = allowed(admin, 'admin.audit.read');
       const canReport = allowed(admin, 'admin.reporting.read');
       const optional = async (request, fallback) => { try { return await request; } catch { return fallback; } };
-      const [prompts, categories, accounts, assignments, invitations, imports, members, generations, feedback, assessmentVersions, assessmentSections, assessmentQuestions, assessmentMappings, assessmentResults, auditLogs] = await Promise.all([
+      const [prompts, categories, accounts, assignments, invitations, imports, members, generations, feedback, assessmentVersions, assessmentSections, assessmentQuestions, assessmentMappings, assessmentResults, marketplaceCategories, marketplaceItems, auditLogs] = await Promise.all([
         canContent || isPlatform ? sb('prompts?select=*,prompt_categories(id,name,slug)&order=updated_at.desc') : Promise.resolve([]),
         canContent || isPlatform ? sb('prompt_categories?select=*&order=sort_order.asc,name.asc') : Promise.resolve([]),
         canRoles || canInvite ? optional(sb('platform_accounts?select=id,email,first_name,last_name,organization,account_type,account_status,membership_status,simulated_tier,account_designation,created_at,updated_at&order=created_at.desc'), []) : Promise.resolve([]),
@@ -38,11 +38,13 @@ exports.handler = async (event) => {
         canContent ? optional(sb('assessment_questions?select=*&order=display_order.asc'), []) : Promise.resolve([]),
         canContent ? optional(sb('assessment_tool_mappings?select=*,prompts(id,title,minimum_tier_rank)&order=priority.asc'), []) : Promise.resolve([]),
         canContent ? optional(sb('assessment_results?select=improvement_areas,priority_ranking,created_at&order=created_at.desc&limit=1000'), []) : Promise.resolve([]),
+        canContent ? optional(sb('marketplace_categories?select=*&order=display_order.asc,name.asc'), []) : Promise.resolve([]),
+        canContent ? optional(sb('marketplace_items?select=id,name,slug,description,is_premium,active,thumbnail_url,cta_label,pricing_status,pricing_model,price,currency,billing_interval,credit_cost,included_runs,trial_available,purchase_url,display_order,marketplace_categories(name,slug)&order=display_order.asc,name.asc'), []) : Promise.resolve([]),
         canAudit ? optional(sb('audit_logs?select=*&order=created_at.desc&limit=100'), []) : Promise.resolve([])
       ]);
       const activeMembers = members?.filter((member) => member.access_enabled && member.source_active).length || 0;
       await audit(admin, 'admin.accessed', 'admin_workspace', null, { path: event.path || '/admin/dashboard' });
-      return response(200, { admin: { account: admin.account, roles: admin.roles, permission_values: [...admin.permissions], permissions: { platform:isPlatform, dashboard:canDashboard, content:canContent, data:canData, roles:canRoles, invitations:canInvite, audit:canAudit, reporting:canReport } }, prompts, categories, accounts, assignments, invitations, imports, members, generations, feedback, assessment: { versions:assessmentVersions, sections:assessmentSections, questions:assessmentQuestions, mappings:assessmentMappings, results:assessmentResults }, audit_logs:auditLogs,
+      return response(200, { admin: { account: admin.account, roles: admin.roles, permission_values: [...admin.permissions], permissions: { platform:isPlatform, dashboard:canDashboard, content:canContent, data:canData, roles:canRoles, invitations:canInvite, audit:canAudit, reporting:canReport } }, prompts, categories, accounts, assignments, invitations, imports, members, generations, feedback, assessment: { versions:assessmentVersions, sections:assessmentSections, questions:assessmentQuestions, mappings:assessmentMappings, results:assessmentResults }, marketplace:{categories:marketplaceCategories,items:marketplaceItems}, audit_logs:auditLogs,
         stats: { members: activeMembers, prompts: prompts?.length || 0, published: prompts?.filter((p) => p.status === 'published').length || 0, administrators: assignments?.filter((item) => item.is_active && ['platform_admin','content_admin','data_admin','super_admin','admin','staff'].includes(item.role)).length || 0, generations: generations?.length || 0 }
       });
     }

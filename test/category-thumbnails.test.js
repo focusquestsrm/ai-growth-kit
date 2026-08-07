@@ -23,16 +23,26 @@ test('one resolver enforces custom, category, and generic thumbnail priority', (
   assert.match(app, /if\(item\?\.thumbnail_url\)return thumbnailImage/);
   assert.match(app, /if\(categoryAsset\)return thumbnailImage/);
   assert.match(app, /category-thumbnail generic/);
-  assert.match(app, /recommendedPrompts\(\)\.map\(\(prompt\)=>promptCard\(prompt,true\)\)/);
+  assert.match(app, /recommendedPrompts\(\)\.map\(\(prompt\)=>recommendedToolCard\(prompt,recommendationReason\(prompt\),true\)\)/);
   assert.match(app, /categoryThumbnail\(visual,true\)/);
   assert.match(app, /toolId=tool\.id\|\|tool\.prompt_id/);
 });
 
 test('thumbnail presentation preserves artwork and accessible descriptions', () => {
-  assert.match(css, /\.category-thumbnail\{height:150px;/);
+  assert.match(css, /\.category-thumbnail\{flex:0 0 120px;width:120px;height:120px;aspect-ratio:1\/1/);
   assert.match(css, /\.category-thumbnail\.image img\{[^}]*object-fit:contain/);
-  assert.match(css, /\.category-thumbnail\.compact\{[^}]*height:96px/);
+  assert.match(css, /\.category-thumbnail\.compact\{[^}]*width:72px;height:72px;aspect-ratio:1\/1/);
   assert.match(app, /alt="\$\{escapeHtml\(alt\)\}" loading="lazy"/);
+});
+
+test('standard and recommendation cards use compact square header layouts', () => {
+  assert.match(app, /class="tool-card-header">\$\{categoryThumbnail\(prompt,compact\)\}/);
+  assert.match(app, /class="recommendation-card-header">\$\{categoryThumbnail\(visual,true\)\}/);
+  assert.match(css, /\.tool-card-header\{display:grid;grid-template-columns:120px minmax\(0,1fr\)/);
+  assert.match(css, /\.recommendation-card-header\{display:grid;grid-template-columns:72px minmax\(0,1fr\)/);
+  assert.match(css, /@media\(max-width:600px\)\{\.category-thumbnail:not\(\.compact\)\{[^}]*width:88px;height:88px/);
+  assert.match(css, /\.category-thumbnail\{[^}]*background:transparent/);
+  assert.doesNotMatch(css, /\.prompt-card>\.category-thumbnail\.compact\{width:calc/);
 });
 
 test('immediate assessment recommendations retain thumbnail metadata', () => {

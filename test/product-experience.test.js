@@ -15,7 +15,7 @@ test('uses the official product identity and footer', () => {
 });
 
 test('member experience contains every Sprint 2 workspace', () => {
-  ['page-dashboard','page-library','page-saved','page-profile','page-assessment','page-opportunities','page-settings'].forEach((id) => assert.match(html, new RegExp(`id="${id}"`)));
+  ['page-dashboard','page-recommended','page-library','page-marketplace','page-marketplace-detail','page-saved','page-profile','page-assessment','page-opportunities','page-settings'].forEach((id) => assert.match(html, new RegExp(`id="${id}"`)));
   assert.doesNotMatch(html, /id="page-history"/);
   assert.match(app, /duplicate_output/);
   assert.match(app, /update_strategy/);
@@ -29,7 +29,7 @@ test('regular member navigation never links to the Intelligence Dashboard', () =
 });
 
 test('member navigation is grouped into five primary destinations', () => {
-  ['Dashboard','My Business','AI Business Tools','Opportunities','Account'].forEach((label) => assert.ok(html.includes(label)));
+  ['Dashboard','My Business','AI Business Tools','Business Growth Marketplace','Account'].forEach((label) => assert.ok(html.includes(label)));
   assert.doesNotMatch(html, />Growth Activity</);
   assert.match(html, /id="adminNav"[^>]*hidden/);
   assert.match(html, /id="platformView"/);

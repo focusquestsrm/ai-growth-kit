@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 test('prompt API gives anonymous users the sign-in message', async () => { const result = await require('../netlify/functions/prompts-list').handler({ httpMethod: 'GET', headers: {} }); assert.equal(result.statusCode, 401); assert.equal(JSON.parse(result.body).error, 'Please sign in to continue.'); });
+test('Marketplace API requires the same member-experience authorization', async () => { const result = await require('../netlify/functions/marketplace-list').handler({ httpMethod: 'GET', headers: {} }); assert.equal(result.statusCode, 401); assert.equal(JSON.parse(result.body).error, 'Please sign in to continue.'); });
 test('admin API denies unauthenticated requests', async () => { const result = await require('../netlify/functions/admin-console').handler({ httpMethod: 'GET', headers: {} }); assert.equal(result.statusCode, 403); });
 test('prompt API rejects unsupported methods', async () => { const result = await require('../netlify/functions/prompts-list').handler({ httpMethod: 'POST', headers: {} }); assert.equal(result.statusCode, 405); });
 test('tier filtering allows cumulative access only to published prompts', () => {
