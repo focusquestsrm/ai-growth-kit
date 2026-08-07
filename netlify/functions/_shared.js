@@ -192,6 +192,18 @@ async function activateInvitation(user) {
   await sb(`platform_invitations?id=eq.${invitation.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ account_status: 'active', accepted_at: new Date().toISOString() }) });
 }
 
+function invitationRedirectUrl(destination = '/admin/login') {
+  const configured = String(process.env.APP_BASE_URL || '').trim();
+  if (!configured) throw new Error('Application URL is not configured');
+  let base;
+  try { base = new URL(configured); } catch { throw new Error('Application URL is invalid'); }
+  const local = base.hostname === 'localhost' || base.hostname === '127.0.0.1';
+  if ((base.protocol !== 'https:' && !(local && base.protocol === 'http:')) || (process.env.CONTEXT === 'production' && local)) throw new Error('Application URL is not safe for invitations');
+  const callback = new URL('/auth/callback', base.origin);
+  callback.searchParams.set('next', String(destination || '/admin/login').startsWith('/') ? destination : '/admin/login');
+  return callback.toString();
+}
+
 function permissionSet(assignments) {
   const values = new Set();
   for (const assignment of assignments || []) {
@@ -234,9 +246,7 @@ async function requireMember(event) {
 
 async function inviteAuthUser(email, destination = '/admin/login') {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) throw new Error('Supabase is not configured');
-  const baseUrl = String(process.env.APP_BASE_URL || '').replace(/\/$/, '');
-  const payload = { email, data: { invited_to: 'd9network-platform' } };
-  if (baseUrl) payload.redirect_to = `${baseUrl}${destination}`;
+  const payload = { email, data: { invited_to: 'd9network-platform' }, redirect_to: invitationRedirectUrl(destination) };
   const res = await fetch(`${SUPABASE_URL}/auth/v1/invite`, { method: 'POST', headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -260,6 +270,6 @@ function parseJson(event) { try { return JSON.parse(event.body || '{}'); } catch
 
 module.exports = {
   ADMIN_ROLES, PLATFORM_ROLES, DEFAULT_ROLE_PERMISSIONS, audit, authenticatedUser, canAccessAdmin, canAccessPlatform, canAccessPrompt, canUseMemberExperience, filterPromptsByTier, hasRole, memberExperienceEligible,
-  ensurePlatformOwner, hasPermission, ignoredMembership, inviteAuthUser, isReadOnlyImpersonation, normalizeEmail, normalizeMembership, parseJson, permissionSet,
+  activateInvitation, ensurePlatformOwner, hasPermission, ignoredMembership, invitationRedirectUrl, inviteAuthUser, isReadOnlyImpersonation, normalizeEmail, normalizeMembership, parseJson, permissionSet,
   preflight, requireAdmin, requireMember, requireRoles, resolvePreviewTierRank, response, sb
 };

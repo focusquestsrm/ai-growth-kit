@@ -1,4 +1,4 @@
-const { ensurePlatformOwner, normalizeEmail, parseJson, preflight, response, sb } = require('./_shared');
+const { activateInvitation, authenticatedUser, ensurePlatformOwner, normalizeEmail, parseJson, preflight, response, sb } = require('./_shared');
 
 exports.handler = async (event) => {
   const pf = preflight(event, ['POST']);
@@ -11,6 +11,25 @@ exports.handler = async (event) => {
     const missing = [!url && 'SUPABASE_URL', !anon && 'SUPABASE_ANON_KEY or SUPABASE_PUBLISHABLE_KEY'].filter(Boolean);
     console.error('auth-session configuration missing', missing);
     return response(503, { error: `Authentication is not configured. Missing: ${missing.join(', ')}` });
+  }
+  if (body.action === 'complete_invitation') {
+    const password = String(body.password || '');
+    if (password.length < 8) return response(400, { error: 'Choose a password with at least 8 characters.' });
+    try {
+      const user = await authenticatedUser(event);
+      if (!user) return response(401, { error: 'This invitation link is invalid or has expired. Ask an administrator to resend it.' });
+      const token = String(event.headers?.authorization || event.headers?.Authorization || '').replace(/^Bearer\s+/i, '');
+      const result = await fetch(`${url}/auth/v1/user`, { method:'PUT', headers:{ apikey:anon, Authorization:`Bearer ${token}`, 'Content-Type':'application/json' }, body:JSON.stringify({ password }) });
+      if (!result.ok) return response(result.status === 401 ? 401 : 400, { error: result.status === 401 ? 'This invitation link is invalid or has expired. Ask an administrator to resend it.' : 'Your password could not be saved. Choose a stronger password and try again.' });
+      const updatedUser = await result.json();
+      await ensurePlatformOwner(updatedUser);
+      await activateInvitation(updatedUser);
+      const metadata = updatedUser.user_metadata || {};
+      return response(200, { success:true, user:{ id:updatedUser.id, email:updatedUser.email, user_metadata:{ first_name:metadata.first_name || null, full_name:metadata.full_name || null } } });
+    } catch (error) {
+      console.error('invitation completion failed', { name:error.name, message:error.message });
+      return response(503, { error:'Unable to finish account setup right now. Please try again.' });
+    }
   }
   const isRefresh = body.action === 'refresh';
   const payload = isRefresh ? { refresh_token: body.refresh_token } : { email: String(body.email || '').trim(), password: String(body.password || '') };

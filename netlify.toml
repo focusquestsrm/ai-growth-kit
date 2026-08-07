@@ -5,6 +5,9 @@
 [functions]
   node_bundler = "esbuild"
 
+[context.production.environment]
+  APP_BASE_URL = "https://ai-growth-kit.netlify.app"
+
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"

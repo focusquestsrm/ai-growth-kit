@@ -38,7 +38,7 @@ test('failed delivery records remain retryable and useful safe errors are return
   assert.match(admin, /authentication account already exists/);
   assert.match(admin, /Supabase email settings/);
   assert.match(shared, /error\.status = res\.status/);
-  assert.match(shared, /if \(baseUrl\) payload\.redirect_to/);
+  assert.match(shared, /redirect_to: invitationRedirectUrl\(destination\)/);
   assert.match(admin, /role === 'member' \? '\/login' : '\/admin\/login'/);
 });
 

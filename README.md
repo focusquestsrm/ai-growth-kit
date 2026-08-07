@@ -44,6 +44,21 @@ INITIAL_PLATFORM_ADMIN_EMAIL
 
 The service-role/secret key is server-only and is not the same credential as the anon/publishable key.
 
+### Invitation redirects
+
+`APP_BASE_URL` is the single server-side application URL used to build invitation callbacks. Set it to `https://ai-growth-kit.netlify.app` in Netlify's production context. Local development may use `http://localhost:3000`; never use a localhost value in production. Invitations are sent to `/auth/callback`, where the SPA removes the Supabase session fragment from the address bar, validates the session, lets the invited user choose a password, and then continues to the appropriate member or administration page.
+
+In Supabase, open **Authentication > URL Configuration** and set:
+
+```text
+Site URL: https://ai-growth-kit.netlify.app
+Additional Redirect URLs:
+https://ai-growth-kit.netlify.app/**
+http://localhost:3000/**
+```
+
+The localhost redirect is for development only. In **Authentication > Email Templates > Invite user**, keep the invitation link based on `{{ .ConfirmationURL }}`. That generated URL carries the `redirect_to` supplied by the server. If a custom link is used, it must preserve `{{ .RedirectTo }}`; do not replace it with a hard-coded `{{ .SiteURL }}`. Password-reset and confirmation templates do not need to change.
+
 ## Access model
 
 Member eligibility is matched by normalized email, Brilliant Directories `user_id`, and supported membership. Supported memberships are Bronze, Silver, Gold, and Platinum. `Bronze II (Claim)` and `Ambassador` records are ignored. Tool availability is determined on the server by membership rank.
@@ -68,7 +83,7 @@ npm run check
 
 ## Deployment
 
-Netlify publishes `public/` and exposes functions from `netlify/functions/`. API routes are mapped from `/api/*` before the single-page application fallback. Configure all four environment variables in Netlify for the relevant deploy contexts, then redeploy.
+Netlify publishes `public/` and exposes functions from `netlify/functions/`. API routes are mapped from `/api/*` before the single-page application fallback. Configure the required environment variables in Netlify for the relevant deploy contexts, including production `APP_BASE_URL=https://ai-growth-kit.netlify.app`, then redeploy. Supabase secret/service-role values remain function-only and must never be prefixed or otherwise exposed to browser code.
 
 See [PRODUCT_VISION.md](PRODUCT_VISION.md) for the roadmap and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for technical boundaries.
 
