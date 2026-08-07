@@ -55,7 +55,11 @@ async function sb(path, options = {}) {
   if (!String(SUPABASE_SERVICE_KEY).startsWith('sb_secret_')) serviceHeaders.Authorization = `Bearer ${SUPABASE_SERVICE_KEY}`;
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, { ...options, headers: { ...serviceHeaders, ...(options.headers || {}) } });
   const text = await res.text();
-  if (!res.ok) throw new Error(`Supabase request failed (${res.status})`);
+  if (!res.ok) {
+    const error = new Error(`Supabase request failed (${res.status})`);
+    error.status = res.status;
+    throw error;
+  }
   return text ? JSON.parse(text) : null;
 }
 
@@ -228,11 +232,19 @@ async function requireMember(event) {
   return access.allowed ? access : null;
 }
 
-async function inviteAuthUser(email) {
+async function inviteAuthUser(email, destination = '/admin/login') {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) throw new Error('Supabase is not configured');
-  const redirectTo = `${String(process.env.APP_BASE_URL || '').replace(/\/$/, '')}/admin/login`;
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/invite`, { method: 'POST', headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, data: { invited_to: 'd9network-platform' }, redirect_to: redirectTo }) });
-  if (!res.ok) throw new Error('Unable to send the secure invitation');
+  const baseUrl = String(process.env.APP_BASE_URL || '').replace(/\/$/, '');
+  const payload = { email, data: { invited_to: 'd9network-platform' } };
+  if (baseUrl) payload.redirect_to = `${baseUrl}${destination}`;
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/invite`, { method: 'POST', headers: { apikey: SUPABASE_SERVICE_KEY, Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    const error = new Error(String(body.msg || body.message || body.error_description || 'Unable to send the secure invitation'));
+    error.status = res.status;
+    error.code = body.code || body.error_code || null;
+    throw error;
+  }
   return res.json();
 }
 

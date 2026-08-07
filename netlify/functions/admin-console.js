@@ -111,13 +111,30 @@ exports.handler = async (event) => {
       const simulatedTier = body.simulated_tier && body.simulated_tier !== 'none' ? body.simulated_tier : null;
       const permissions = Array.isArray(body.permissions) ? body.permissions.filter((item) => /^admin\.[a-z_.]+$/.test(item)) : [];
       if (!email || !INVITABLE_ROLES.includes(role) || !ACCOUNT_TYPES.includes(accountType) || !ACCOUNT_STATUSES.includes(accountStatus) || !MEMBERSHIP_STATUSES.includes(membershipStatus) || (simulatedTier && !TIER_RANKS[simulatedTier])) return response(400, { error: 'Complete every account and access selection' });
-      const created = await sb('platform_invitations', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ email, normalized_email: email, first_name: String(body.first_name || '').trim() || null, last_name: String(body.last_name || '').trim() || null, role, permissions, account_type: accountType, account_status: accountStatus, membership_status: membershipStatus, simulated_tier: simulatedTier, invited_by: admin.account.id }) });
+      const existing = await sb(`platform_invitations?normalized_email=eq.${encodeURIComponent(email)}&order=created_at.desc&limit=1&select=id,accepted_at,auth_invited_at`);
+      if (existing?.[0]?.accepted_at) return response(409, { error: 'This user has already accepted an invitation.' });
+      if (existing?.[0]?.auth_invited_at) return response(409, { error: 'A secure invitation has already been sent to this email.' });
+      const invitationPayload = { email, normalized_email: email, first_name: String(body.first_name || '').trim() || null, last_name: String(body.last_name || '').trim() || null, role, permissions, account_type: accountType, account_status: accountStatus, membership_status: membershipStatus, simulated_tier: simulatedTier, invited_by: admin.account.id };
+      let created;
       try {
-        await inviteAuthUser(email);
+        created = existing?.[0]
+          ? await sb(`platform_invitations?id=eq.${existing[0].id}`, { method:'PATCH', headers:{ Prefer:'return=representation' }, body:JSON.stringify(invitationPayload) })
+          : await sb('platform_invitations', { method:'POST', headers:{ Prefer:'return=representation' }, body:JSON.stringify(invitationPayload) });
+      } catch (error) {
+        if (error.status === 409) return response(409, { error:'An invitation for this email is already being processed.' });
+        throw error;
+      }
+      try {
+        await inviteAuthUser(email, role === 'member' ? '/login' : '/admin/login');
         await sb(`platform_invitations?id=eq.${created?.[0]?.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ auth_invited_at: new Date().toISOString() }) });
       } catch (error) {
         await audit(admin, 'invitation.delivery_failed', 'platform_invitation', created?.[0]?.id, { role, account_type: accountType });
-        throw error;
+        await sb(`platform_invitations?normalized_email=eq.${encodeURIComponent(email)}&auth_invited_at=is.null&accepted_at=is.null`, { method:'DELETE', headers:{ Prefer:'return=minimal' } }).catch(() => null);
+        const detail = `${error.code || ''} ${error.message || ''}`.toLowerCase();
+        if (error.status === 429) return response(429, { error:'Invitation email limit reached. Please wait and try again.' });
+        if (/already|registered|exists|duplicate/.test(detail)) return response(409, { error:'An authentication account already exists for this email. Ask the user to sign in or reset their password.' });
+        console.error('invitation delivery failed', { status:error.status, code:error.code, message:error.message });
+        return response(502, { error:'The invitation could not be delivered. Check the Supabase email settings and try again.' });
       }
       await audit(admin, 'invitation.sent', 'platform_invitation', created?.[0]?.id, { role, account_type: accountType, membership_status: membershipStatus, simulated_tier: simulatedTier });
       return response(200, { success: true, invitation_id: created?.[0]?.id });

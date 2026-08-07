@@ -61,6 +61,9 @@ test('persistent onboarding supports members and platform-admin Member View secu
 
 test('tour is restartable, keyboard dismissible, focusable, and responsive', () => {
   assert.match(html, /data-start-tour>Take a Tour/);
+  assert.match(html, /id="topTourButton"[^>]*data-start-tour[^>]*aria-label="Start the platform tour"/);
+  assert.match(app, /\$\('#topTourButton'\)\.classList\.toggle\('hidden',!show\)/);
+  assert.match(css, /\.top-tour-button:focus-visible/);
   assert.match(html, /id="tourPanel"[^>]*tabindex="-1"/);
   assert.match(app, /event\.key==='Escape'/);
   assert.match(app, /panel\.focus\(\)/);
