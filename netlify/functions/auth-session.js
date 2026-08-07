@@ -12,6 +12,17 @@ exports.handler = async (event) => {
     console.error('auth-session configuration missing', missing);
     return response(503, { error: `Authentication is not configured. Missing: ${missing.join(', ')}` });
   }
+  if (body.action === 'logout') {
+    const token = String(event.headers?.authorization || event.headers?.Authorization || '').replace(/^Bearer\s+/i, '');
+    if (!token) return response(200, { success:true });
+    try {
+      const result = await fetch(`${url}/auth/v1/logout`, { method:'POST', headers:{ apikey:anon, Authorization:`Bearer ${token}` } });
+      if (!result.ok && result.status !== 401) return response(502, { error:'Unable to end the server session.' });
+      return response(200, { success:true });
+    } catch {
+      return response(503, { error:'Unable to end the server session.' });
+    }
+  }
   if (body.action === 'complete_invitation') {
     const password = String(body.password || '');
     if (password.length < 8) return response(400, { error: 'Choose a password with at least 8 characters.' });
