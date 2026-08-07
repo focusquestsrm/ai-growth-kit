@@ -32,7 +32,7 @@ test('member navigation is grouped into five primary destinations', () => {
   ['Dashboard','My Business','AI Business Tools','Opportunities','Account'].forEach((label) => assert.ok(html.includes(label)));
   assert.doesNotMatch(html, />Growth Activity</);
   assert.match(html, /id="adminNav"[^>]*hidden/);
-  assert.doesNotMatch(html, /id="platformNav"|accountViewMode|Admin View/);
+  assert.match(html, /id="platformView"/);
 });
 
 test('uses centralized compact typography tokens', () => {
@@ -44,7 +44,7 @@ test('uses centralized compact typography tokens', () => {
 
 test('Saved Strategies is the single editable generated-work repository', () => {
   const workspace = fs.readFileSync(path.join(root, 'netlify', 'functions', 'member-workspace.js'), 'utf8');
-  assert.match(workspace, /saved_strategies\?member_access_id=eq\./);
+  assert.match(workspace, /saved_strategies\?\$\{ownerFilter\}/);
   assert.match(workspace, /body\.action === 'update_strategy'/);
   ['Open','Duplicate','Export','Delete'].forEach((action) => assert.ok(html.includes(action) || app.includes(action)));
   assert.doesNotMatch(html, /Saved Outputs|Saved Documents/i);

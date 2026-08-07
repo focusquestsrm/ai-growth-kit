@@ -1,4 +1,4 @@
-const { parseJson, preflight, requireAdmin, requireMember, response, sb } = require('./_shared');
+const { canUseMemberExperience, parseJson, preflight, response, sb } = require('./_shared');
 
 const VALID_ANSWERS = ['yes', 'partially', 'no', 'not_applicable'];
 const ANSWER_WEIGHT = { yes: 0, partially: 1, no: 2, not_applicable: 0 };
@@ -53,19 +53,15 @@ async function assessmentDefinition() {
 exports.handler = async (event) => {
   const pf = preflight(event, ['GET','POST']);
   if (pf) return pf;
-  let access = await requireMember(event);
-  let platformPreview = false;
-  if (!access) {
-    const platform = await requireAdmin(event, 'admin.testing.impersonate');
-    if (!platform) return response(403, { error: 'Member access required' });
-    platformPreview = true;
-    access = { member: { id:null, growth_kit_tier_rank:4 } };
-  }
+  const access = await canUseMemberExperience(event);
+  if (!access.allowed) return response(access.statusCode, { error: access.error });
+  const ownerFilter = `${access.ownerColumn}=eq.${encodeURIComponent(access.ownerId)}`;
+  const ownerPayload = { [access.ownerColumn]: access.ownerId };
   try {
     const definition = await assessmentDefinition();
     if (!definition) return response(404, { error: 'No active assessment is available' });
     if (event.httpMethod === 'GET') {
-      const responses = platformPreview ? [] : await sb(`assessment_responses?member_access_id=eq.${access.member.id}&version_id=eq.${definition.version.id}&select=id,answers,completed_at&order=completed_at.desc&limit=1`);
+      const responses = await sb(`assessment_responses?${ownerFilter}&version_id=eq.${definition.version.id}&select=id,answers,completed_at&order=completed_at.desc&limit=1`);
       let latest = null;
       if (responses?.[0]) {
         const results = await sb(`assessment_results?response_id=eq.${responses[0].id}&select=*`);
@@ -79,16 +75,14 @@ exports.handler = async (event) => {
     const answers = body.answers || {};
     const missing = definition.questions.filter((question) => !VALID_ANSWERS.includes(answers[question.id]));
     if (missing.length) return response(400, { error: 'Answer every assessment question before completing the assessment' });
-    const previewRank = Math.min(4,Math.max(1,Number(body.preview_tier_rank)||4));
-    const calculated = calculateAssessment(definition.sections, definition.questions, definition.mappings, answers, platformPreview ? previewRank : access.member.growth_kit_tier_rank);
-    if (platformPreview) return response(200, { completed_at:new Date().toISOString(), preview:true, result:calculated });
-    const created = await sb('assessment_responses', { method:'POST', headers:{ Prefer:'return=representation' }, body:JSON.stringify({ member_access_id:access.member.id, version_id:definition.version.id, answers }) });
+    const calculated = calculateAssessment(definition.sections, definition.questions, definition.mappings, answers, access.tierRank);
+    const created = await sb('assessment_responses', { method:'POST', headers:{ Prefer:'return=representation' }, body:JSON.stringify({ ...ownerPayload, version_id:definition.version.id, answers }) });
     const responseId = created?.[0]?.id;
     await sb('assessment_results', { method:'POST', headers:{ Prefer:'return=minimal' }, body:JSON.stringify({ response_id:responseId, identified_strengths:calculated.strengths, improvement_areas:calculated.improvementAreas, priority_ranking:calculated.priorities, actions_30_day:calculated.actions30, actions_90_day:calculated.actions90, future_agent_recommendations:calculated.futureAgents }) });
     if (calculated.recommendations.length) await sb('assessment_recommendations', { method:'POST', headers:{ Prefer:'return=minimal' }, body:JSON.stringify(calculated.recommendations.map((item) => ({ response_id:responseId, prompt_id:item.prompt_id, priority:item.priority, is_locked:item.is_locked, required_tier_rank:item.required_tier_rank, alternative_prompt_id:item.alternative_prompt_id, reason:item.reason }))) });
-    return response(200, { completed_at:created?.[0]?.completed_at, result:calculated });
+    return response(200, { completed_at:created?.[0]?.completed_at, preview:access.isPlatformAdmin, result:calculated });
   } catch (error) {
-    console.error('assessment', { message:error.message, memberId:access.member.id });
+    console.error('assessment', { message:error.message, ownerId:access.ownerId });
     return response(500, { error: 'Unable to load or complete the Business Growth Assessment' });
   }
 };

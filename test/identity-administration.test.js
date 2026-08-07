@@ -19,18 +19,19 @@ test('identity is rendered from database profile fields without placeholders', (
   assert.doesNotMatch(`${html}\n${app}`, /Your Name|Welcome, Your|>YN<|D9 Member/);
 });
 
-test('member and administrator entry points are separate', () => {
+test('member and administrator entry points support platform view switching', () => {
   assert.match(app, /location\.pathname\.startsWith\('\/admin'\)/);
   assert.match(app, /'\/admin\/login'/);
   assert.match(app, /'\/login'/);
-  assert.doesNotMatch(html, /accountViewMode|Admin View|Platform View/);
+  assert.match(html, /Platform View/);
+  assert.match(html, /Member View/);
   assert.match(html, /id="adminNav"[^>]*hidden/);
 });
 
 test('owner identity and role are created from protected configuration', () => {
-  ['PLATFORM_OWNER_EMAIL', 'PLATFORM_OWNER_FIRST_NAME', 'PLATFORM_OWNER_LAST_NAME'].forEach((name) => assert.match(shared, new RegExp(`process\\.env\\.${name}`)));
+  assert.match(shared, /process\.env\.INITIAL_PLATFORM_ADMIN_EMAIL/);
   assert.match(shared, /account_designation: 'Platform Administrator'/);
-  assert.match(shared, /role: 'super_admin'/);
+  assert.match(shared, /role: 'platform_admin'/);
   assert.match(app, /Welcome, \$\{first\}\./);
   assert.doesNotMatch(shared, /Nick Alberti|@d9network/i);
 });
@@ -43,11 +44,10 @@ test('roles, account state, membership, and simulation remain separate', () => {
   assert.match(migration, /check \(membership_status = 'member' or member_access_id is null\)/);
 });
 
-test('staff requires explicit permissions and view-as-user is audited read-only', () => {
+test('canonical admin roles have scoped permissions and view-as-user is audited read-only', () => {
   const { permissionSet, hasPermission } = require('../netlify/functions/_shared');
-  assert.equal(hasPermission(permissionSet([{ role: 'staff', permissions: [] }]), 'admin.imports.manage'), false);
-  assert.equal(hasPermission(permissionSet([{ role: 'staff', permissions: ['admin.imports.manage'] }]), 'admin.imports.manage'), true);
-  assert.match(admin, /Staff accounts require at least one explicit permission/);
+  assert.equal(hasPermission(permissionSet([{ role: 'content_admin', permissions: [] }]), 'admin.imports.manage'), false);
+  assert.equal(hasPermission(permissionSet([{ role: 'data_admin', permissions: [] }]), 'admin.imports.manage'), true);
   assert.match(admin, /is_read_only:true/);
   assert.match(admin, /impersonation\.started/);
   assert.match(admin, /Changes are disabled while viewing as another user/);

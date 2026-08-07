@@ -1,4 +1,4 @@
-const { parseJson, preflight, requireMember, response, sb } = require('./_shared');
+const { canUseMemberExperience, parseJson, preflight, response, sb } = require('./_shared');
 
 const INDUSTRIES = ['Accounting & Financial Services','Advertising, Marketing & Public Relations','Agriculture & Food Production','Arts, Entertainment & Media','Automotive & Transportation Services','Beauty, Personal Care & Wellness','Business Consulting & Professional Services','Childcare & Family Services','Construction & Skilled Trades','Consumer Products & Retail','Education & Training','Energy & Utilities','Engineering & Technical Services','Event Planning & Hospitality','Food & Beverage','Government & Public Sector Services','Healthcare & Medical Services','Home Services & Property Maintenance','Human Resources & Staffing','Information Technology & Cybersecurity','Insurance','Legal Services','Logistics, Distribution & Supply Chain','Manufacturing','Nonprofit & Community Services','Real Estate & Property Management','Restaurants & Catering','Security & Protective Services','Sports, Fitness & Recreation','Telecommunications','Travel & Tourism','Transportation & Delivery','Other'];
 const STAGES = ['Idea','Startup','Established','Scaling','Mature'];
@@ -11,35 +11,36 @@ const validUrl = (value) => { if (!value) return true; try { return ['http:','ht
 exports.handler = async (event) => {
   const pf = preflight(event, ['GET', 'POST', 'DELETE']);
   if (pf) return pf;
-  const access = await requireMember(event);
-  if (!access) return response(403, { error: 'Member access required' });
-  const memberId = access.member.id;
+  const access = await canUseMemberExperience(event);
+  if (!access.allowed) return response(access.statusCode, { error: access.error });
+  const ownerFilter = `${access.ownerColumn}=eq.${encodeURIComponent(access.ownerId)}`;
+  const ownerPayload = { [access.ownerColumn]: access.ownerId };
   try {
     if (event.httpMethod === 'GET') {
       const optional = async (request, fallback) => { try { return await request; } catch { return fallback; } };
-      const loadStrategies = async () => { try { return await sb(`saved_strategies?member_access_id=eq.${memberId}&select=id,title,strategy_text,input_payload,is_favorite,created_at,updated_at,prompts(title,slug)&order=updated_at.desc&limit=100`); } catch { const legacy = await sb(`saved_outputs?member_access_id=eq.${memberId}&select=id,title,output_text,input_payload,created_at,updated_at,prompts(title,slug)&order=updated_at.desc&limit=100`); return (legacy || []).map((item) => ({ ...item, strategy_text:item.output_text, is_favorite:false })); } };
+      const loadStrategies = async () => { try { return await sb(`saved_strategies?${ownerFilter}&select=id,title,strategy_text,input_payload,is_favorite,created_at,updated_at,prompts(title,slug)&order=updated_at.desc&limit=100`); } catch { const legacy = await sb(`saved_outputs?${ownerFilter}&select=id,title,output_text,input_payload,created_at,updated_at,prompts(title,slug)&order=updated_at.desc&limit=100`); return (legacy || []).map((item) => ({ ...item, strategy_text:item.output_text, is_favorite:false })); } };
       const [profile, outputs, generations, favorites, health] = await Promise.all([
-        sb(`business_profiles?member_access_id=eq.${memberId}&select=*`),
+        sb(`business_profiles?${ownerFilter}&select=*`),
         loadStrategies(),
-        sb(`prompt_generations?member_access_id=eq.${memberId}&select=id,status,created_at,prompts(title,slug,prompt_categories(name))&order=created_at.desc&limit=20`),
-        optional(sb(`favorite_tools?member_access_id=eq.${memberId}&select=prompt_id,created_at`), []),
-        optional(sb(`business_health_assessments?member_access_id=eq.${memberId}&select=*&order=created_at.desc&limit=1`), [])
+        sb(`prompt_generations?${ownerFilter}&select=id,status,created_at,prompts(title,slug,prompt_categories(name))&order=created_at.desc&limit=20`),
+        optional(sb(`favorite_tools?${ownerFilter}&select=prompt_id,created_at`), []),
+        optional(sb(`business_health_assessments?${ownerFilter}&select=*&order=created_at.desc&limit=1`), [])
       ]);
       return response(200, { profile: profile?.[0] || null, outputs: outputs || [], generations: generations || [], favorites: favorites || [], health: health?.[0] || null });
     }
     const body = parseJson(event);
     if (!body?.action) return response(400, { error: 'Action is required' });
     if (body.action === 'record_generation' || body.action === 'save_output') {
-      const prompts = await sb(`prompts?id=eq.${encodeURIComponent(body.prompt_id)}&status=eq.published&minimum_tier_rank=lte.${access.member.growth_kit_tier_rank}&select=id,title`);
+      const prompts = await sb(`prompts?id=eq.${encodeURIComponent(body.prompt_id)}&status=eq.published&minimum_tier_rank=lte.${access.tierRank}&select=id,title`);
       if (prompts?.length !== 1) return response(403, { error: 'Prompt access denied' });
       if (body.action === 'record_generation') {
-        const created = await sb('prompt_generations', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ member_access_id: memberId, prompt_id: prompts[0].id, input_payload: body.input_payload || {}, output_text: String(body.output_text || ''), status: 'completed' }) });
+        const created = await sb('prompt_generations', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ ...ownerPayload, prompt_id: prompts[0].id, input_payload: body.input_payload || {}, output_text: String(body.output_text || ''), status: 'completed' }) });
         return response(200, { generation: created?.[0] });
       }
       if (!String(body.output_text || '').trim()) return response(400, { error: 'Output is required' });
       let saved;
-      try { saved = await sb('saved_strategies', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ member_access_id: memberId, prompt_id: prompts[0].id, title: String(body.title || prompts[0].title).trim(), input_payload: body.input_payload || {}, strategy_text: String(body.output_text).trim() }) }); }
-      catch { saved = await sb('saved_outputs', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ member_access_id: memberId, prompt_id: prompts[0].id, title: String(body.title || prompts[0].title).trim(), input_payload: body.input_payload || {}, output_text: String(body.output_text).trim() }) }); }
+      try { saved = await sb('saved_strategies', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ ...ownerPayload, prompt_id: prompts[0].id, title: String(body.title || prompts[0].title).trim(), input_payload: body.input_payload || {}, strategy_text: String(body.output_text).trim() }) }); }
+      catch { saved = await sb('saved_outputs', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ ...ownerPayload, prompt_id: prompts[0].id, title: String(body.title || prompts[0].title).trim(), input_payload: body.input_payload || {}, output_text: String(body.output_text).trim() }) }); }
       return response(200, { output: saved?.[0] });
     }
     if (body.action === 'save_profile') {
@@ -68,20 +69,20 @@ exports.handler = async (event) => {
       profile.business_certifications = certifications;
       profile.primary_business_challenges = challenges;
       profile.years_in_business = input.years_in_business === '' || input.years_in_business == null ? null : Math.max(0, Number(input.years_in_business) || 0);
-      profile.member_access_id = memberId; profile.updated_at = new Date().toISOString();
-      const saved = await sb('business_profiles?on_conflict=member_access_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify(profile) });
+      Object.assign(profile, ownerPayload); profile.updated_at = new Date().toISOString();
+      const saved = await sb(`business_profiles?on_conflict=${access.ownerColumn}`, { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=representation' }, body: JSON.stringify(profile) });
       return response(200, { profile: saved?.[0] });
     }
     if (body.action === 'delete_output') {
-      try { await sb(`saved_strategies?id=eq.${encodeURIComponent(body.id)}&member_access_id=eq.${memberId}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }); }
-      catch { await sb(`saved_outputs?id=eq.${encodeURIComponent(body.id)}&member_access_id=eq.${memberId}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }); }
+      try { await sb(`saved_strategies?id=eq.${encodeURIComponent(body.id)}&${ownerFilter}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }); }
+      catch { await sb(`saved_outputs?id=eq.${encodeURIComponent(body.id)}&${ownerFilter}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }); }
       return response(200, { success: true });
     }
     if (body.action === 'duplicate_output') {
-      let legacy=false,rows; try { rows = await sb(`saved_strategies?id=eq.${encodeURIComponent(body.id)}&member_access_id=eq.${memberId}&select=prompt_id,title,input_payload,strategy_text`); } catch { legacy=true; rows=await sb(`saved_outputs?id=eq.${encodeURIComponent(body.id)}&member_access_id=eq.${memberId}&select=prompt_id,title,input_payload,output_text`); if(rows?.[0])rows[0].strategy_text=rows[0].output_text; }
+      let legacy=false,rows; try { rows = await sb(`saved_strategies?id=eq.${encodeURIComponent(body.id)}&${ownerFilter}&select=prompt_id,title,input_payload,strategy_text`); } catch { legacy=true; rows=await sb(`saved_outputs?id=eq.${encodeURIComponent(body.id)}&${ownerFilter}&select=prompt_id,title,input_payload,output_text`); if(rows?.[0])rows[0].strategy_text=rows[0].output_text; }
       if (rows?.length !== 1) return response(404, { error: 'Saved strategy not found' });
       const original = rows[0];
-      const payload={ member_access_id:memberId,prompt_id:original.prompt_id,title:`${original.title} (Copy)`,input_payload:original.input_payload,[legacy?'output_text':'strategy_text']:original.strategy_text };
+      const payload={ ...ownerPayload,prompt_id:original.prompt_id,title:`${original.title} (Copy)`,input_payload:original.input_payload,[legacy?'output_text':'strategy_text']:original.strategy_text };
       const saved = await sb(legacy?'saved_outputs':'saved_strategies', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify(payload) });
       return response(200, { output: saved?.[0] });
     }
@@ -89,16 +90,16 @@ exports.handler = async (event) => {
       const title = String(body.title || '').trim();
       const strategyText = String(body.strategy_text || '').trim();
       if (!body.id || !title || !strategyText) return response(400, { error: 'Strategy title and content are required' });
-      let saved; try { saved = await sb(`saved_strategies?id=eq.${encodeURIComponent(body.id)}&member_access_id=eq.${memberId}`, { method:'PATCH', headers:{ Prefer:'return=representation' }, body:JSON.stringify({ title, strategy_text:strategyText, is_favorite:Boolean(body.is_favorite), updated_at:new Date().toISOString() }) }); }
-      catch { saved = await sb(`saved_outputs?id=eq.${encodeURIComponent(body.id)}&member_access_id=eq.${memberId}`, { method:'PATCH', headers:{ Prefer:'return=representation' }, body:JSON.stringify({ title, output_text:strategyText, updated_at:new Date().toISOString() }) }); }
+      let saved; try { saved = await sb(`saved_strategies?id=eq.${encodeURIComponent(body.id)}&${ownerFilter}`, { method:'PATCH', headers:{ Prefer:'return=representation' }, body:JSON.stringify({ title, strategy_text:strategyText, is_favorite:Boolean(body.is_favorite), updated_at:new Date().toISOString() }) }); }
+      catch { saved = await sb(`saved_outputs?id=eq.${encodeURIComponent(body.id)}&${ownerFilter}`, { method:'PATCH', headers:{ Prefer:'return=representation' }, body:JSON.stringify({ title, output_text:strategyText, updated_at:new Date().toISOString() }) }); }
       if (!saved?.length) return response(404, { error: 'Saved strategy not found' });
       return response(200, { output:saved[0] });
     }
     if (body.action === 'set_favorite') {
-      const prompts = await sb(`prompts?id=eq.${encodeURIComponent(body.prompt_id)}&status=eq.published&minimum_tier_rank=lte.${access.member.growth_kit_tier_rank}&select=id`);
+      const prompts = await sb(`prompts?id=eq.${encodeURIComponent(body.prompt_id)}&status=eq.published&minimum_tier_rank=lte.${access.tierRank}&select=id`);
       if (prompts?.length !== 1) return response(403, { error: 'Business Growth Tool access denied' });
-      if (body.favorite) await sb('favorite_tools?on_conflict=member_access_id,prompt_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ member_access_id: memberId, prompt_id: body.prompt_id }) });
-      else await sb(`favorite_tools?member_access_id=eq.${memberId}&prompt_id=eq.${encodeURIComponent(body.prompt_id)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+      if (body.favorite) await sb(`favorite_tools?on_conflict=${access.ownerColumn},prompt_id`, { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ ...ownerPayload, prompt_id: body.prompt_id }) });
+      else await sb(`favorite_tools?${ownerFilter}&prompt_id=eq.${encodeURIComponent(body.prompt_id)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
       return response(200, { success: true });
     }
     if (body.action === 'submit_feedback') {
@@ -107,7 +108,7 @@ exports.handler = async (event) => {
       const type = ['suggestion','strategy_rating','issue'].includes(body.feedback_type) ? body.feedback_type : 'suggestion';
       const comments = String(body.comments || '').trim();
       if (!comments && rating == null) return response(400, { error: 'Add a rating or comment' });
-      await sb('platform_feedback', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ member_access_id: memberId, page: String(body.page || 'dashboard').slice(0, 80), prompt_id: body.prompt_id || null, saved_output_id: body.saved_output_id || null, rating, feedback_type: type, comments: comments || null }) });
+      await sb('platform_feedback', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ ...ownerPayload, page: String(body.page || 'dashboard').slice(0, 80), prompt_id: body.prompt_id || null, saved_output_id: body.saved_output_id || null, rating, feedback_type: type, comments: comments || null }) });
       return response(200, { success: true });
     }
     if (body.action === 'save_health') {
@@ -115,12 +116,12 @@ exports.handler = async (event) => {
       const scores = Object.fromEntries(keys.map((key) => [key, Number(body[key])]));
       if (keys.some((key) => !Number.isInteger(scores[key]) || scores[key] < 1 || scores[key] > 5)) return response(400, { error: 'All health scores must be between 1 and 5' });
       scores.overall_score = Number((keys.reduce((sum, key) => sum + scores[key], 0) / keys.length).toFixed(2));
-      const saved = await sb('business_health_assessments', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ member_access_id: memberId, ...scores }) });
+      const saved = await sb('business_health_assessments', { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ ...ownerPayload, ...scores }) });
       return response(200, { health: saved?.[0] });
     }
     return response(400, { error: 'Unsupported action' });
   } catch (error) {
-    console.error('member-workspace', { message: error.message, memberId, method: event.httpMethod });
+    console.error('member-workspace', { message: error.message, ownerId: access.ownerId, method: event.httpMethod });
     return response(500, { error: 'Unable to update the member workspace' });
   }
 };

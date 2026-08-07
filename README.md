@@ -29,6 +29,7 @@ The D9Network AI Business Growth Platform is a secure, member-facing SaaS applic
    - `006_identity_administration.sql`
    - `007_business_profile_experience.sql`
    - `008_visual_growth_experience.sql`
+   - `009_platform_admin_member_experience.sql`
 5. Run `npm run dev` for the Netlify development server.
 
 Required server environment variables:
@@ -38,9 +39,7 @@ SUPABASE_URL
 SUPABASE_ANON_KEY (or SUPABASE_PUBLISHABLE_KEY)
 SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_KEY)
 APP_BASE_URL
-PLATFORM_OWNER_EMAIL
-PLATFORM_OWNER_FIRST_NAME
-PLATFORM_OWNER_LAST_NAME
+INITIAL_PLATFORM_ADMIN_EMAIL
 ```
 
 The service-role/secret key is server-only and is not the same credential as the anon/publishable key.
@@ -49,9 +48,9 @@ The service-role/secret key is server-only and is not the same credential as the
 
 Member eligibility is matched by normalized email, Brilliant Directories `user_id`, and supported membership. Supported memberships are Bronze, Silver, Gold, and Platinum. `Bronze II (Claim)` and `Ambassador` records are ignored. Tool availability is determined on the server by membership rank.
 
-Administrative access is assigned separately through `platform_accounts` and `platform_role_assignments`. The supported platform roles are `super_admin`, `admin`, `staff`, `executive_viewer`, `member`, `partner_admin`, `tester`, and `read_only`. Staff access requires explicit permission keys. Membership status and simulated tier are separate fields; simulation never changes a real membership record.
+Administrative access is assigned separately from Brilliant Directories membership. The canonical roles are `platform_admin`, `content_admin`, `data_admin`, and `member`. Only `platform_admin` automatically receives access to the member experience; content and data administrators still need a supported active membership.
 
-Members sign in at `/login`. Authorized administrators sign in at `/admin/login`. Configure the three `PLATFORM_OWNER_*` values as protected environment variables, invite the platform owner through Supabase Authentication, and sign in once at `/admin/login`. That first authenticated sign-in creates the active internal `super_admin` account and stores the configured name in the database. No password is stored in source or environment configuration.
+Members sign in at `/login`. Authorized administrators can open `/platform` or `/admin/login`. Configure `INITIAL_PLATFORM_ADMIN_EMAIL` as a protected, server-only environment variable and create that identity through Supabase Authentication. On the first successful sign-in by the exact email, the server idempotently assigns and audits `platform_admin`; no password or administrator email is shipped to the browser. Apply migration `009_platform_admin_member_experience.sql` before testing Member View. Platform preview tiers are request-scoped and never change membership or role records.
 
 ## Member synchronization
 
