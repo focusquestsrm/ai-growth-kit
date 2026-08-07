@@ -14,7 +14,8 @@ test('dashboard hero uses approved copy, artwork, personalization, and live metr
   assert.match(html, /Your Growth Journey/);
   assert.match(html, /<span>Starts Here\.<\/span>/);
   assert.match(html, /Everything you need to build, grow, and scale your business/);
-  assert.match(app, /`Welcome Back, \$\{first\}`/);
+  assert.match(app, /function personalizedGreeting/);
+  assert.match(app, /dashboardWelcome'\)\.textContent=personalizedGreeting/);
   assert.match(app, /state\.prompts\.length/);
   assert.match(app, /saved\.length/);
   assert.match(app, /assessmentDashboardState/);

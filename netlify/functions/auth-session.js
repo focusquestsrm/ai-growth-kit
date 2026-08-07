@@ -24,7 +24,8 @@ exports.handler = async (event) => {
     const session = await result.json();
     await ensurePlatformOwner(session.user);
     try { await sb(`user_roles?normalized_email=eq.${encodeURIComponent(normalizeEmail(session.user.email))}`, { method:'PATCH', headers:{ Prefer:'return=minimal' }, body:JSON.stringify({ last_login_at:new Date().toISOString() }) }); } catch {}
-    return response(200, { access_token: session.access_token, refresh_token: session.refresh_token, expires_in: session.expires_in, user: { id: session.user.id, email: session.user.email } });
+    const metadata = session.user.user_metadata || {};
+    return response(200, { access_token: session.access_token, refresh_token: session.refresh_token, expires_in: session.expires_in, user: { id: session.user.id, email: session.user.email, user_metadata: { first_name: metadata.first_name || null, full_name: metadata.full_name || null } } });
   } catch (error) {
     console.error('auth-session', error);
     return response(503, { error: 'Unable to sign in right now.' });

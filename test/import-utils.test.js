@@ -26,3 +26,8 @@ test('maps the Brilliant Directories active field without deleting omitted membe
   assert.equal(result.accepted[0].access_enabled, false);
   assert.equal(result.accepted[1].source_active, true);
 });
+test('stores Brilliant Directories first names using common export headings', () => {
+  const result = processRows([{ user_id: 6, email: 'sean@example.com', subscription_name: 'Bronze', 'First Name': 'Sean', 'Last Name': 'Jones' }]);
+  assert.equal(result.accepted[0].first_name, 'Sean');
+  assert.equal(result.accepted[0].last_name, 'Jones');
+});

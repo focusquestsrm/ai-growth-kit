@@ -3,7 +3,7 @@ const { ignoredMembership, normalizeEmail, normalizeMembership } = require('./_s
 const COLUMN_ALIASES = {
   user_id: ['user_id', 'id'], email: ['email', 'user_email'],
   subscription_name: ['subscription_name', 'membership', 'membership_category'],
-  first_name: ['first_name'], last_name: ['last_name'], company: ['company'], d9_affiliation: ['d9_affiliation'],
+  first_name: ['first_name', 'first name', 'firstname'], last_name: ['last_name', 'last name', 'lastname'], company: ['company'], d9_affiliation: ['d9_affiliation'],
   active: ['active', 'is_active', 'status']
 };
 

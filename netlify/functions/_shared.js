@@ -1,6 +1,7 @@
 const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
+const { resolveFirstName } = require('./_identity');
 
 const APP_ORIGIN = process.env.APP_BASE_URL || '*';
 const headers = {
@@ -100,15 +101,15 @@ async function audit(actor, action, entityType, entityId, details = {}) {
 async function ensurePlatformOwner(user) {
   const ownerEmail = normalizeEmail(process.env.INITIAL_PLATFORM_ADMIN_EMAIL);
   if (!ownerEmail || normalizeEmail(user.email) !== ownerEmail) return;
-  const firstName = String(user.user_metadata?.first_name || '').trim() || null;
-  const lastName = String(user.user_metadata?.last_name || '').trim() || null;
   const existingRoles = await sb(`user_roles?auth_user_id=eq.${encodeURIComponent(user.id)}&role=eq.platform_admin&is_active=eq.true&select=id`);
   if (!existingRoles?.length) {
     await sb('user_roles', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ auth_user_id: user.id, email: user.email, normalized_email: ownerEmail, role: 'platform_admin', is_active: true, assigned_by: 'INITIAL_PLATFORM_ADMIN_EMAIL' }) });
     await audit({ user, email: ownerEmail }, 'platform_admin.bootstrap', 'user_role', null, { source: 'INITIAL_PLATFORM_ADMIN_EMAIL' });
   }
-  const accounts = await sb(`platform_accounts?normalized_email=eq.${encodeURIComponent(ownerEmail)}&select=id,auth_user_id`);
+  const accounts = await sb(`platform_accounts?normalized_email=eq.${encodeURIComponent(ownerEmail)}&select=id,auth_user_id,first_name,last_name`);
   let account = accounts?.[0];
+  const firstName = resolveFirstName(account || {}, user) || null;
+  const lastName = String(account?.last_name || user.user_metadata?.last_name || '').trim() || null;
   const payload = { auth_user_id: user.id, email: user.email, normalized_email: ownerEmail, first_name: firstName, last_name: lastName, organization: 'D9Network', account_type: 'internal', account_status: 'active', membership_status: 'non_member', member_access_id: null, simulated_tier: null, account_designation: 'Platform Administrator', updated_at: new Date().toISOString() };
   if (account) {
     const updated = await sb(`platform_accounts?id=eq.${account.id}`, { method: 'PATCH', headers: { Prefer: 'return=representation' }, body: JSON.stringify(payload) });
@@ -143,15 +144,19 @@ async function canUseMemberExperience(event) {
   if (!user) return { allowed: false, statusCode: 401, error: 'Please sign in to continue.' };
   await ensurePlatformOwner(user);
   const email = normalizeEmail(user.email);
-  const [members, roles] = await Promise.all([
+  const [members, roles, accounts] = await Promise.all([
     sb(`member_app_access?or=(auth_user_id.eq.${encodeURIComponent(user.id)},normalized_email.eq.${encodeURIComponent(email)})&access_enabled=eq.true&source_active=eq.true&growth_kit_tier=in.(Bronze,Silver,Gold,Platinum)&select=id,first_name,last_name,company,d9_affiliation,growth_kit_tier,growth_kit_tier_rank`),
-    activeRoles(user)
+    activeRoles(user),
+    sb(`platform_accounts?or=(auth_user_id.eq.${encodeURIComponent(user.id)},normalized_email.eq.${encodeURIComponent(email)})&account_status=eq.active&select=id,first_name,last_name`)
   ]);
   const member = Array.isArray(members) && members.length === 1 ? members[0] : null;
-  const access = { user, email, member, roles };
+  const account = accounts?.[0] || null;
+  const access = { user, email, member, account, roles };
   access.allowed = memberExperienceEligible(access);
   if (!access.allowed) return { ...access, statusCode: 403, error: 'Your account does not currently have access to this feature.' };
   access.isPlatformAdmin = canAccessPlatform(access);
+  access.identityProfile = access.isPlatformAdmin ? (account || member || {}) : (member || account || {});
+  access.firstName = resolveFirstName(access.identityProfile, user);
   access.tierRank = previewTierRank(event, access);
   access.ownerColumn = access.isPlatformAdmin ? 'auth_user_id' : 'member_access_id';
   access.ownerId = access.ownerColumn === 'auth_user_id' ? user.id : member.id;
